@@ -15,10 +15,21 @@ const renameChatButton = document.querySelector("#renameChat");
 const deleteChatButton = document.querySelector("#deleteChat");
 const exportChatButton = document.querySelector("#exportChat");
 const regenerateButton = document.querySelector("#regenerate");
+const focusModeButton = document.querySelector("#focusMode");
+const exitFocusButton = document.querySelector("#exitFocus");
 const sendButton = document.querySelector("#send");
 const stopButton = document.querySelector("#stop");
 const fileUploadEl = document.querySelector("#fileUpload");
 const documentsEl = document.querySelector("#documents");
+const imagePromptEl = document.querySelector("#imagePrompt");
+const negativePromptEl = document.querySelector("#negativePrompt");
+const checkpointNameEl = document.querySelector("#checkpointName");
+const imageSizeEl = document.querySelector("#imageSize");
+const imageStepsEl = document.querySelector("#imageSteps");
+const imageCfgEl = document.querySelector("#imageCfg");
+const generateImageButton = document.querySelector("#generateImage");
+const imageOutputEl = document.querySelector("#imageOutput");
+const imageStatusEl = document.querySelector("#imageStatus");
 const statusEl = document.querySelector("#status");
 const activeTitleEl = document.querySelector("#activeTitle");
 
@@ -509,6 +520,67 @@ regenerateButton.addEventListener("click", async () => {
 
 stopButton.addEventListener("click", () => {
   abortController?.abort();
+});
+
+function setFocusMode(enabled) {
+  document.body.classList.toggle("focus-mode", enabled);
+  exitFocusButton.classList.toggle("hidden", !enabled);
+}
+
+focusModeButton.addEventListener("click", () => setFocusMode(true));
+exitFocusButton.addEventListener("click", () => setFocusMode(false));
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.body.classList.contains("focus-mode")) {
+    setFocusMode(false);
+  }
+});
+
+generateImageButton.addEventListener("click", async () => {
+  const prompt = imagePromptEl.value.trim();
+  if (!prompt) {
+    imageStatusEl.textContent = "Add an image prompt first.";
+    imagePromptEl.focus();
+    return;
+  }
+
+  const [width, height] = imageSizeEl.value.split("x").map(Number);
+  generateImageButton.disabled = true;
+  imageStatusEl.textContent = "Generating in ComfyUI...";
+
+  try {
+    const response = await fetch("/api/images/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        negativePrompt: negativePromptEl.value.trim(),
+        checkpoint: checkpointNameEl.value.trim(),
+        width,
+        height,
+        steps: Number(imageStepsEl.value),
+        cfg: Number(imageCfgEl.value)
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || result.error || "Image generation failed.");
+
+    imageOutputEl.classList.remove("hidden");
+    imageOutputEl.replaceChildren();
+    const image = document.createElement("img");
+    image.src = result.image;
+    image.alt = prompt;
+
+    const meta = document.createElement("p");
+    meta.textContent = `Generated ${result.filename} with seed ${result.seed}`;
+
+    imageOutputEl.append(image, meta);
+    imageStatusEl.textContent = "Image ready.";
+  } catch (error) {
+    imageStatusEl.textContent = error.message;
+  } finally {
+    generateImageButton.disabled = false;
+  }
 });
 
 fileUploadEl.addEventListener("change", async () => {
