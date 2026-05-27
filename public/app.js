@@ -497,6 +497,22 @@ async function generateImageForConversation(prompt) {
   }
 }
 
+function isNaturalImageRequest(text) {
+  const normalized = text.toLowerCase();
+  return (
+    /\b(generate|create|make|draw|show)\b/.test(normalized) &&
+    /\b(image|photo|picture|portrait|selfie|photograph)\b/.test(normalized)
+  );
+}
+
+function imagePromptFromRequest(text) {
+  return text
+    .replace(/^\/image\s+/i, "")
+    .replace(/^(please\s+)?(generate|create|make|draw|show)\s+(me\s+)?(a|an|the)?\s*/i, "")
+    .replace(/^(image|photo|picture|portrait|selfie|photograph)\s+(of\s+)?/i, "")
+    .trim();
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -515,9 +531,9 @@ form.addEventListener("submit", async (event) => {
   const text = promptEl.value.trim();
   if (!text || abortController) return;
 
-  if (text.toLowerCase().startsWith("/image ")) {
+  if (text.toLowerCase().startsWith("/image ") || isNaturalImageRequest(text)) {
     promptEl.value = "";
-    const imagePrompt = text.slice(7).trim();
+    const imagePrompt = imagePromptFromRequest(text);
     if (imagePrompt) {
       await generateImageForConversation(imagePrompt);
     }

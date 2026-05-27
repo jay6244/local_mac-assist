@@ -225,6 +225,25 @@ function isDisallowedImagePrompt(prompt) {
   ].some((term) => normalized.includes(term));
 }
 
+function enhancePhotoPrompt(prompt) {
+  const normalized = prompt.toLowerCase();
+  const alreadyPhoto = /\b(photo|photograph|realistic|photorealistic|dslr|mirror selfie|iphone|camera)\b/.test(normalized);
+  const basePrompt = alreadyPhoto ? prompt : `realistic photograph of ${prompt}`;
+
+  return [
+    basePrompt,
+    "natural indoor lighting",
+    "lifelike skin texture",
+    "real camera perspective",
+    "sharp focus",
+    "high detail",
+    "not illustration",
+    "not cartoon",
+    "not ASCII art",
+    "not drawing"
+  ].join(", ");
+}
+
 async function handleGenerateImage(req, res) {
   try {
     const body = await readRequestBody(req);
@@ -246,7 +265,8 @@ async function handleGenerateImage(req, res) {
     const seed = Number.isFinite(Number(body.seed)) && Number(body.seed) >= 0
       ? Number(body.seed)
       : Math.floor(Math.random() * 1_000_000_000);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${new URLSearchParams({
+    const enhancedPrompt = enhancePhotoPrompt(prompt);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?${new URLSearchParams({
       width: String(width),
       height: String(height),
       seed: String(seed),
@@ -268,6 +288,7 @@ async function handleGenerateImage(req, res) {
       imageUrl,
       image: `data:${contentType};base64,${imageBuffer.toString("base64")}`,
       provider: "Pollinations",
+      prompt: enhancedPrompt,
       seed
     });
   } catch (error) {
