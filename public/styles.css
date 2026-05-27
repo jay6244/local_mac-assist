@@ -346,6 +346,20 @@ h1 {
   white-space: pre;
 }
 
+.generated-image-link {
+  display: block;
+  margin-top: 12px;
+}
+
+.generated-image {
+  width: min(420px, 100%);
+  max-height: 420px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #090d0e;
+}
+
 .copy-button {
   min-height: 28px;
   margin-top: 10px;
@@ -396,7 +410,7 @@ h1 {
 
 .image-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(170px, 0.7fr) minmax(96px, 0.35fr) minmax(96px, 0.35fr);
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
   gap: 10px;
 }
 

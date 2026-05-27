@@ -47,10 +47,10 @@
           <section id="imagePanel" class="image-panel" aria-label="Image generation">
             <div class="image-panel-header">
               <div>
-                <p class="panel-kicker">ComfyUI image studio</p>
-                <h2>Generate with Juggernaut XL</h2>
+                <p class="panel-kicker">Chat image mode</p>
+                <h2>Type /image in chat</h2>
               </div>
-              <p id="imageStatus" class="image-status">ComfyUI: localhost:8188</p>
+              <p id="imageStatus" class="image-status">Uses cloud image generation</p>
             </div>
             <div class="image-grid">
               <label class="image-field image-field-wide">
@@ -62,10 +62,6 @@
                 <input id="negativePrompt" value="low quality, blurry, distorted, watermark, text">
               </label>
               <label class="image-field">
-                <span>Checkpoint</span>
-                <input id="checkpointName" value="juggernautXL_v9Rdphoto2Lightning.safetensors">
-              </label>
-              <label class="image-field">
                 <span>Size</span>
                 <select id="imageSize">
                   <option value="1024x1024">1024 x 1024</option>
@@ -73,17 +69,9 @@
                   <option value="1216x832">1216 x 832</option>
                 </select>
               </label>
-              <label class="image-field">
-                <span>Steps</span>
-                <input id="imageSteps" type="number" min="4" max="40" value="20">
-              </label>
-              <label class="image-field">
-                <span>CFG</span>
-                <input id="imageCfg" type="number" min="1" max="12" step="0.5" value="6">
-              </label>
             </div>
             <div class="image-actions">
-              <button id="generateImage" type="button">Generate image</button>
+              <button id="generateImage" type="button">Send /image to chat</button>
             </div>
             <div id="imageOutput" class="image-output hidden"></div>
           </section>

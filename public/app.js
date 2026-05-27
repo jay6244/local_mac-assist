@@ -23,10 +23,7 @@ const fileUploadEl = document.querySelector("#fileUpload");
 const documentsEl = document.querySelector("#documents");
 const imagePromptEl = document.querySelector("#imagePrompt");
 const negativePromptEl = document.querySelector("#negativePrompt");
-const checkpointNameEl = document.querySelector("#checkpointName");
 const imageSizeEl = document.querySelector("#imageSize");
-const imageStepsEl = document.querySelector("#imageSteps");
-const imageCfgEl = document.querySelector("#imageCfg");
 const generateImageButton = document.querySelector("#generateImage");
 const imageOutputEl = document.querySelector("#imageOutput");
 const imageStatusEl = document.querySelector("#imageStatus");
@@ -188,6 +185,22 @@ function createMessageNode(message) {
   body.className = "message-body";
   body.innerHTML = renderMarkdown(message.content);
   node.append(body);
+
+  if (message.imageUrl) {
+    const imageLink = document.createElement("a");
+    imageLink.href = message.imageUrl;
+    imageLink.target = "_blank";
+    imageLink.rel = "noreferrer";
+    imageLink.className = "generated-image-link";
+
+    const image = document.createElement("img");
+    image.className = "generated-image";
+    image.src = message.imageUrl;
+    image.alt = message.prompt || "Generated image";
+
+    imageLink.append(image);
+    node.append(imageLink);
+  }
 
   if (message.role === "assistant" && message.content.trim()) {
     const copyButton = document.createElement("button");
@@ -418,6 +431,67 @@ async function sendCurrentConversation() {
   }
 }
 
+async function generateImageForConversation(prompt) {
+  const conversation = activeConversation();
+  const [width, height] = imageSizeEl.value.split("x").map(Number);
+
+  conversation.messages.push({ role: "user", content: `/image ${prompt}` });
+  conversation.updatedAt = Date.now();
+  if (conversation.title === "New chat") {
+    conversation.title = titleFromMessage(prompt);
+  }
+  saveState();
+  renderAll();
+
+  imageStatusEl.textContent = "Creating image...";
+  generateImageButton.disabled = true;
+
+  try {
+    const response = await fetch("/api/images/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        negativePrompt: negativePromptEl.value.trim(),
+        width,
+        height
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Image generation failed.");
+
+    conversation.messages.push({
+      role: "assistant",
+      content: `Generated image via ${result.provider}. Seed: ${result.seed}`,
+      imageUrl: result.imageUrl,
+      prompt
+    });
+    conversation.updatedAt = Date.now();
+    saveState();
+    renderAll();
+
+    imageOutputEl.classList.remove("hidden");
+    imageOutputEl.replaceChildren();
+    const image = document.createElement("img");
+    image.src = result.imageUrl;
+    image.alt = prompt;
+    const meta = document.createElement("p");
+    meta.textContent = "Also added to the chat.";
+    imageOutputEl.append(image, meta);
+    imageStatusEl.textContent = "Image added to chat.";
+  } catch (error) {
+    conversation.messages.push({
+      role: "error",
+      content: error.message
+    });
+    saveState();
+    renderAll();
+    imageStatusEl.textContent = error.message;
+  } finally {
+    generateImageButton.disabled = false;
+  }
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -435,6 +509,15 @@ form.addEventListener("submit", async (event) => {
 
   const text = promptEl.value.trim();
   if (!text || abortController) return;
+
+  if (text.toLowerCase().startsWith("/image ")) {
+    promptEl.value = "";
+    const imagePrompt = text.slice(7).trim();
+    if (imagePrompt) {
+      await generateImageForConversation(imagePrompt);
+    }
+    return;
+  }
 
   const conversation = activeConversation();
   promptEl.value = "";
@@ -543,44 +626,7 @@ generateImageButton.addEventListener("click", async () => {
     imagePromptEl.focus();
     return;
   }
-
-  const [width, height] = imageSizeEl.value.split("x").map(Number);
-  generateImageButton.disabled = true;
-  imageStatusEl.textContent = "Generating in ComfyUI...";
-
-  try {
-    const response = await fetch("/api/images/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt,
-        negativePrompt: negativePromptEl.value.trim(),
-        checkpoint: checkpointNameEl.value.trim(),
-        width,
-        height,
-        steps: Number(imageStepsEl.value),
-        cfg: Number(imageCfgEl.value)
-      })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || result.error || "Image generation failed.");
-
-    imageOutputEl.classList.remove("hidden");
-    imageOutputEl.replaceChildren();
-    const image = document.createElement("img");
-    image.src = result.image;
-    image.alt = prompt;
-
-    const meta = document.createElement("p");
-    meta.textContent = `Generated ${result.filename} with seed ${result.seed}`;
-
-    imageOutputEl.append(image, meta);
-    imageStatusEl.textContent = "Image ready.";
-  } catch (error) {
-    imageStatusEl.textContent = error.message;
-  } finally {
-    generateImageButton.disabled = false;
-  }
+  await generateImageForConversation(prompt);
 });
 
 fileUploadEl.addEventListener("change", async () => {
