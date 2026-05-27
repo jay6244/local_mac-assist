@@ -44,7 +44,7 @@ You can type that model name into the app's model field if you want to try it, b
 - Lets you hide individual chats from the sidebar and reveal them with **Hidden**.
 - Shows installed Ollama models in a picker.
 - Includes Focus mode to hide the sidebar/top chrome.
-- Adds chat-based non-explicit image generation with `/image your prompt`.
+- Adds chat-based non-explicit image generation with `/image your prompt`, using ComfyUI local or a cloud fallback.
 - Renders basic markdown, including inline code and fenced code blocks.
 - Includes a stop button while the model is responding.
 - Includes a copy button for assistant replies.
@@ -73,6 +73,15 @@ Type an image request directly in chat:
 /image cinematic photo of a futuristic desk assistant
 ```
 
-The image settings panel controls output size. It uses a cloud image URL provider, so image prompts are sent outside your Mac.
+You can also ask naturally, for example:
 
-The app does not require ComfyUI for image generation now.
+```txt
+generate a realistic photo of a flying horse at golden hour
+```
+
+The image settings panel controls provider, size, and checkpoint.
+
+- **ComfyUI local** sends prompts to `http://127.0.0.1:8188` and uses the checkpoint filename in the panel.
+- **Cloud fallback** uses a cloud image URL provider, so image prompts are sent outside your Mac.
+
+If your Juggernaut XL file has a different name, copy the exact checkpoint filename from ComfyUI into the checkpoint field.

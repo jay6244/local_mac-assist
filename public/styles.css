@@ -393,10 +393,13 @@ h1 {
 }
 
 .image-panel-header {
+  flex: 1;
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: start;
+  align-items: end;
+  flex-wrap: wrap;
 }
 
 .panel-kicker {
@@ -431,6 +434,14 @@ h1 {
   min-width: 0;
   display: grid;
   gap: 6px;
+}
+
+.checkpoint-field {
+  flex: 1 1 260px;
+}
+
+.image-field:not(.checkpoint-field) {
+  flex: 0 0 150px;
 }
 
 .image-field span {

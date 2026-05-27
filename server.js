@@ -1,4 +1,5 @@
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { PDFParse } from "pdf-parse";
@@ -8,6 +9,7 @@ const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = join(process.cwd(), "public");
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
+const COMFYUI_URL = process.env.COMFYUI_URL || "http://127.0.0.1:8188";
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const MAX_EXTRACTED_CHARS = 45000;
 const MAX_PDF_PAGES_FOR_CITATIONS = 80;
@@ -31,6 +33,10 @@ function sendJson(res, status, data) {
 function sendStreamEvent(res, event, data) {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function readRequestBody(req, limitBytes = 2 * 1024 * 1024) {
@@ -178,7 +184,7 @@ async function handleExtractFile(req, res) {
     const body = await readRequestBody(req, MAX_UPLOAD_BYTES * 2);
     const extracted = await extractFileText(body);
     sendJson(res, 200, extracted);
-  } catch (error) {
+  } catch {
     sendJson(res, error.statusCode || 500, {
       error: error.message || "Could not extract that file."
     });
@@ -228,20 +234,177 @@ function isDisallowedImagePrompt(prompt) {
 function enhancePhotoPrompt(prompt) {
   const normalized = prompt.toLowerCase();
   const alreadyPhoto = /\b(photo|photograph|realistic|photorealistic|dslr|mirror selfie|iphone|camera)\b/.test(normalized);
+  const hasOutdoorCue = /\b(outdoor|outside|street|garden|beach|mountain|forest|field|sunset|sunrise|golden hour)\b/.test(normalized);
+  const hasPersonCue = /\b(person|people|woman|man|girl|boy|portrait|selfie|face|skin)\b/.test(normalized);
   const basePrompt = alreadyPhoto ? prompt : `realistic photograph of ${prompt}`;
+  const qualityDetails = [
+    hasOutdoorCue ? "natural lighting" : "natural indoor lighting",
+    "real camera perspective",
+    "sharp focus",
+    "high detail"
+  ];
+
+  if (hasPersonCue) {
+    qualityDetails.splice(1, 0, "lifelike skin texture");
+  }
 
   return [
     basePrompt,
-    "natural indoor lighting",
-    "lifelike skin texture",
-    "real camera perspective",
-    "sharp focus",
-    "high detail",
+    ...qualityDetails,
     "not illustration",
     "not cartoon",
     "not ASCII art",
     "not drawing"
   ].join(", ");
+}
+
+function buildComfyWorkflow({ prompt, checkpoint, width, height, seed }) {
+  const fastCheckpoint = /lightning|turbo/i.test(checkpoint);
+
+  return {
+    "1": {
+      class_type: "CheckpointLoaderSimple",
+      inputs: {
+        ckpt_name: checkpoint
+      }
+    },
+    "2": {
+      class_type: "CLIPTextEncode",
+      inputs: {
+        text: prompt,
+        clip: ["1", 1]
+      }
+    },
+    "3": {
+      class_type: "CLIPTextEncode",
+      inputs: {
+        text: "low quality, blurry, distorted, watermark, text, illustration, cartoon, ascii art, drawing",
+        clip: ["1", 1]
+      }
+    },
+    "4": {
+      class_type: "EmptyLatentImage",
+      inputs: {
+        width,
+        height,
+        batch_size: 1
+      }
+    },
+    "5": {
+      class_type: "KSampler",
+      inputs: {
+        seed,
+        steps: fastCheckpoint ? 8 : 24,
+        cfg: fastCheckpoint ? 2.5 : 6,
+        sampler_name: "euler",
+        scheduler: "normal",
+        denoise: 1,
+        model: ["1", 0],
+        positive: ["2", 0],
+        negative: ["3", 0],
+        latent_image: ["4", 0]
+      }
+    },
+    "6": {
+      class_type: "VAEDecode",
+      inputs: {
+        samples: ["5", 0],
+        vae: ["1", 2]
+      }
+    },
+    "7": {
+      class_type: "SaveImage",
+      inputs: {
+        filename_prefix: "local_mac_assist",
+        images: ["6", 0]
+      }
+    }
+  };
+}
+
+async function generateWithCloud({ prompt, width, height, seed }) {
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${new URLSearchParams({
+    width: String(width),
+    height: String(height),
+    seed: String(seed),
+    nologo: "true",
+    private: "true",
+    safe: "true"
+  })}`;
+  const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(120000) });
+
+  if (!imageResponse.ok) {
+    const error = new Error("The image provider did not return an image.");
+    error.statusCode = 502;
+    throw error;
+  }
+
+  const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+  const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+
+  return {
+    imageUrl,
+    image: `data:${contentType};base64,${imageBuffer.toString("base64")}`,
+    provider: "Pollinations"
+  };
+}
+
+async function generateWithComfyUI({ prompt, checkpoint, width, height, seed }) {
+  let promptResponse;
+  try {
+    promptResponse = await fetch(`${COMFYUI_URL}/prompt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: randomUUID(),
+        prompt: buildComfyWorkflow({ prompt, checkpoint, width, height, seed })
+      })
+    });
+  } catch (error) {
+    const comfyError = new Error(`ComfyUI is not reachable at ${COMFYUI_URL}. Start ComfyUI or switch to Cloud fallback.`);
+    comfyError.statusCode = 503;
+    throw comfyError;
+  }
+
+  if (!promptResponse.ok) {
+    const error = new Error("ComfyUI rejected the workflow. Check the checkpoint filename.");
+    error.statusCode = 502;
+    throw error;
+  }
+
+  const queued = await promptResponse.json();
+  const promptId = queued.prompt_id;
+
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    await sleep(1000);
+    const historyResponse = await fetch(`${COMFYUI_URL}/history/${promptId}`);
+    if (!historyResponse.ok) continue;
+    const history = await historyResponse.json();
+    const run = history[promptId];
+    const images = Object.values(run?.outputs || {}).flatMap((output) => output.images || []);
+
+    if (images.length) {
+      const image = images[0];
+      const imageUrl = `${COMFYUI_URL}/view?${new URLSearchParams({
+        filename: image.filename,
+        subfolder: image.subfolder || "",
+        type: image.type || "output"
+      })}`;
+      const imageResponse = await fetch(imageUrl);
+      const contentType = imageResponse.headers.get("content-type") || "image/png";
+      const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+
+      return {
+        imageUrl,
+        image: `data:${contentType};base64,${imageBuffer.toString("base64")}`,
+        provider: "ComfyUI"
+      };
+    }
+  }
+
+  const error = new Error("ComfyUI did not finish the image within 5 minutes.");
+  error.statusCode = 504;
+  throw error;
 }
 
 async function handleGenerateImage(req, res) {
@@ -262,38 +425,24 @@ async function handleGenerateImage(req, res) {
 
     const width = Math.min(1280, Math.max(512, Number(body.width || 1024)));
     const height = Math.min(1280, Math.max(512, Number(body.height || 1024)));
+    const provider = body.provider === "comfyui" ? "comfyui" : "cloud";
+    const checkpoint = String(body.checkpoint || "").trim() || "juggernautXL_v9Rdphoto2Lightning.safetensors";
     const seed = Number.isFinite(Number(body.seed)) && Number(body.seed) >= 0
       ? Number(body.seed)
       : Math.floor(Math.random() * 1_000_000_000);
     const enhancedPrompt = enhancePhotoPrompt(prompt);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?${new URLSearchParams({
-      width: String(width),
-      height: String(height),
-      seed: String(seed),
-      nologo: "true",
-      private: "true",
-      safe: "true"
-    })}`;
-    const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(120000) });
-
-    if (!imageResponse.ok) {
-      sendJson(res, 502, { error: "The image provider did not return an image." });
-      return;
-    }
-
-    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const result = provider === "comfyui"
+      ? await generateWithComfyUI({ prompt: enhancedPrompt, checkpoint, width, height, seed })
+      : await generateWithCloud({ prompt: enhancedPrompt, width, height, seed });
 
     sendJson(res, 200, {
-      imageUrl,
-      image: `data:${contentType};base64,${imageBuffer.toString("base64")}`,
-      provider: "Pollinations",
+      ...result,
       prompt: enhancedPrompt,
       seed
     });
   } catch (error) {
-    sendJson(res, 500, {
-      error: "Could not create the image URL.",
+    sendJson(res, error.statusCode || 503, {
+      error: error.message || "Could not generate the image.",
       detail: error.message
     });
   }

@@ -50,8 +50,15 @@
             <div class="image-panel-header">
               <div>
                 <p class="panel-kicker">Chat image mode</p>
-                <h2>Use /image in the chat box</h2>
+                <h2>Use /image, or ask for a photo</h2>
               </div>
+              <label class="image-field">
+                <span>Provider</span>
+                <select id="imageProvider">
+                  <option value="comfyui">ComfyUI local</option>
+                  <option value="cloud">Cloud fallback</option>
+                </select>
+              </label>
               <label class="image-field">
                 <span>Size</span>
                 <select id="imageSize">
@@ -59,6 +66,10 @@
                   <option value="832x1216">832 x 1216</option>
                   <option value="1216x832">1216 x 832</option>
                 </select>
+              </label>
+              <label class="image-field checkpoint-field">
+                <span>Checkpoint</span>
+                <input id="checkpointName" type="text" value="juggernautXL_v9Rdphoto2Lightning.safetensors" spellcheck="false">
               </label>
             </div>
           </section>

@@ -23,7 +23,9 @@ const sendButton = document.querySelector("#send");
 const stopButton = document.querySelector("#stop");
 const fileUploadEl = document.querySelector("#fileUpload");
 const documentsEl = document.querySelector("#documents");
+const imageProviderEl = document.querySelector("#imageProvider");
 const imageSizeEl = document.querySelector("#imageSize");
+const checkpointNameEl = document.querySelector("#checkpointName");
 const statusEl = document.querySelector("#status");
 const activeTitleEl = document.querySelector("#activeTitle");
 
@@ -447,6 +449,8 @@ async function sendCurrentConversation() {
 async function generateImageForConversation(prompt) {
   const conversation = activeConversation();
   const [width, height] = imageSizeEl.value.split("x").map(Number);
+  const provider = imageProviderEl.value;
+  const providerLabel = provider === "comfyui" ? "ComfyUI" : "cloud fallback";
 
   conversation.messages.push({ role: "user", content: `/image ${prompt}` });
   conversation.updatedAt = Date.now();
@@ -456,7 +460,7 @@ async function generateImageForConversation(prompt) {
   saveState();
   renderAll();
 
-  statusEl.textContent = "Creating image...";
+  statusEl.textContent = `Creating image with ${providerLabel}...`;
   sendButton.disabled = true;
 
   try {
@@ -466,7 +470,9 @@ async function generateImageForConversation(prompt) {
       body: JSON.stringify({
         prompt,
         width,
-        height
+        height,
+        provider,
+        checkpoint: checkpointNameEl.value.trim()
       })
     });
     const result = await response.json();
@@ -494,6 +500,7 @@ async function generateImageForConversation(prompt) {
     statusEl.textContent = error.message;
   } finally {
     sendButton.disabled = false;
+    promptEl.focus();
   }
 }
 
