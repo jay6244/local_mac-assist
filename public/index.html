@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Local Chatbot</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="app">
+        <aside class="sidebar">
+          <div class="brand">
+            <p class="eyebrow">Local chatbot</p>
+            <h1>M3 Desk Companion</h1>
+          </div>
+          <button id="newChat" class="primary-rail-button" type="button" aria-label="Start new chat">New chat</button>
+          <div class="chat-actions" aria-label="Chat actions">
+            <button id="renameChat" class="icon-button" type="button" aria-label="Rename chat">Rename</button>
+            <button id="deleteChat" class="icon-button danger-button" type="button" aria-label="Delete chat">Delete</button>
+            <button id="exportChat" class="icon-button" type="button" aria-label="Export chat">Export</button>
+          </div>
+          <nav id="conversationList" class="conversation-list" aria-label="Saved chats"></nav>
+        </aside>
+
+        <section class="chat">
+          <header class="topbar">
+            <div class="chat-heading">
+              <p id="activeTitle" class="chat-title">New chat</p>
+              <p id="status" class="status">Ready on llama3.2:3b</p>
+            </div>
+            <div class="controls">
+              <label class="toggle">
+                <input id="demoMode" type="checkbox">
+                <span>Demo</span>
+              </label>
+              <select id="model" aria-label="Model name">
+                <option value="llama3.2:3b">llama3.2:3b</option>
+              </select>
+              <button id="regenerate" class="secondary-button" type="button" aria-label="Regenerate response">Regenerate</button>
+            </div>
+          </header>
+
+          <div id="messages" class="messages" aria-live="polite"></div>
+          <div id="documents" class="documents hidden" aria-label="Attached documents"></div>
+
+          <form id="composer" class="composer">
+            <label class="attach-button" for="fileUpload" aria-label="Attach document">Attach</label>
+            <input id="fileUpload" class="file-input" type="file" accept=".pdf,.docx,.txt,.md,.csv,.json,.js,.ts,.tsx,.jsx,.html,.css,.py,.java,.sql,.log,text/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            <textarea id="prompt" rows="1" placeholder="Ask anything..." autofocus></textarea>
+            <button id="stop" class="secondary-button hidden" type="button" aria-label="Stop response">Stop</button>
+            <button id="send" type="submit" aria-label="Send message">
+              <span>Send</span>
+            </button>
+          </form>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
