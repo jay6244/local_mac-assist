@@ -146,7 +146,7 @@ h1 {
 
 .chat-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -196,6 +196,17 @@ h1 {
   border-color: rgba(88, 196, 182, 0.42);
   color: var(--text);
   background: rgba(88, 196, 182, 0.12);
+}
+
+.conversation-button.is-hidden-chat {
+  color: var(--faint);
+  border-style: dashed;
+}
+
+.active-tool {
+  border-color: rgba(88, 196, 182, 0.42);
+  color: var(--text);
+  background: rgba(88, 196, 182, 0.1);
 }
 
 .chat {
@@ -372,9 +383,11 @@ h1 {
 }
 
 .image-panel {
-  display: grid;
-  gap: 12px;
-  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 16px;
   border-top: 1px solid var(--line);
   background: rgba(15, 21, 22, 0.86);
 }
@@ -397,7 +410,7 @@ h1 {
 
 .image-panel h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
   letter-spacing: 0;
 }
 
@@ -409,8 +422,8 @@ h1 {
 }
 
 .image-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
+  display: flex;
+  align-items: end;
   gap: 10px;
 }
 
@@ -418,10 +431,6 @@ h1 {
   min-width: 0;
   display: grid;
   gap: 6px;
-}
-
-.image-field-wide {
-  grid-column: span 2;
 }
 
 .image-field span {
@@ -441,41 +450,6 @@ h1 {
   outline: none;
   background: var(--field);
   color: var(--text);
-}
-
-.image-field textarea {
-  min-height: 76px;
-  resize: vertical;
-}
-
-.image-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-#generateImage {
-  min-height: 42px;
-  padding: 0 16px;
-}
-
-.image-output {
-  display: grid;
-  gap: 8px;
-}
-
-.image-output img {
-  width: min(360px, 100%);
-  max-height: 360px;
-  object-fit: contain;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #090d0e;
-}
-
-.image-output p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.78rem;
 }
 
 .documents {
@@ -655,7 +629,7 @@ textarea:focus,
 
   .chat-actions {
     grid-column: 1 / -1;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .conversation-list {
@@ -695,12 +669,14 @@ textarea:focus,
     padding: 14px;
   }
 
-  .image-grid {
-    grid-template-columns: 1fr 1fr;
+  .image-panel {
+    align-items: stretch;
+    flex-direction: column;
   }
 
-  .image-field-wide {
-    grid-column: 1 / -1;
+  .image-grid {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .composer {

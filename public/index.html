@@ -20,6 +20,8 @@
             <button id="renameChat" class="icon-button" type="button" aria-label="Rename chat">Rename</button>
             <button id="deleteChat" class="icon-button danger-button" type="button" aria-label="Delete chat">Delete</button>
             <button id="exportChat" class="icon-button" type="button" aria-label="Export chat">Export</button>
+            <button id="hideChat" class="icon-button" type="button" aria-label="Hide chat">Hide</button>
+            <button id="showHidden" class="icon-button" type="button" aria-label="Show hidden chats">Hidden</button>
             <button id="focusMode" class="icon-button" type="button" aria-label="Toggle focus mode">Focus</button>
           </div>
           <nav id="conversationList" class="conversation-list" aria-label="Saved chats"></nav>
@@ -48,19 +50,8 @@
             <div class="image-panel-header">
               <div>
                 <p class="panel-kicker">Chat image mode</p>
-                <h2>Type /image in chat</h2>
+                <h2>Use /image in the chat box</h2>
               </div>
-              <p id="imageStatus" class="image-status">Uses cloud image generation</p>
-            </div>
-            <div class="image-grid">
-              <label class="image-field image-field-wide">
-                <span>Prompt</span>
-                <textarea id="imagePrompt" rows="3" placeholder="Describe the image you want..."></textarea>
-              </label>
-              <label class="image-field image-field-wide">
-                <span>Negative prompt</span>
-                <input id="negativePrompt" value="low quality, blurry, distorted, watermark, text">
-              </label>
               <label class="image-field">
                 <span>Size</span>
                 <select id="imageSize">
@@ -70,10 +61,6 @@
                 </select>
               </label>
             </div>
-            <div class="image-actions">
-              <button id="generateImage" type="button">Send /image to chat</button>
-            </div>
-            <div id="imageOutput" class="image-output hidden"></div>
           </section>
           <div id="documents" class="documents hidden" aria-label="Attached documents"></div>
 

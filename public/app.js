@@ -14,6 +14,8 @@ const newChatButton = document.querySelector("#newChat");
 const renameChatButton = document.querySelector("#renameChat");
 const deleteChatButton = document.querySelector("#deleteChat");
 const exportChatButton = document.querySelector("#exportChat");
+const hideChatButton = document.querySelector("#hideChat");
+const showHiddenButton = document.querySelector("#showHidden");
 const regenerateButton = document.querySelector("#regenerate");
 const focusModeButton = document.querySelector("#focusMode");
 const exitFocusButton = document.querySelector("#exitFocus");
@@ -21,12 +23,7 @@ const sendButton = document.querySelector("#send");
 const stopButton = document.querySelector("#stop");
 const fileUploadEl = document.querySelector("#fileUpload");
 const documentsEl = document.querySelector("#documents");
-const imagePromptEl = document.querySelector("#imagePrompt");
-const negativePromptEl = document.querySelector("#negativePrompt");
 const imageSizeEl = document.querySelector("#imageSize");
-const generateImageButton = document.querySelector("#generateImage");
-const imageOutputEl = document.querySelector("#imageOutput");
-const imageStatusEl = document.querySelector("#imageStatus");
 const statusEl = document.querySelector("#status");
 const activeTitleEl = document.querySelector("#activeTitle");
 
@@ -43,6 +40,7 @@ function createConversation() {
     title: "New chat",
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    hidden: false,
     documents: [],
     messages: [{ ...welcomeMessage }]
   };
@@ -59,6 +57,7 @@ function loadState() {
   const firstConversation = createConversation();
   return {
     activeId: firstConversation.id,
+    showHidden: false,
     conversations: [firstConversation]
   };
 }
@@ -68,8 +67,14 @@ function saveState() {
 }
 
 function activeConversation() {
-  const conversation = state.conversations.find((item) => item.id === state.activeId);
+  let conversation = state.conversations.find((item) => item.id === state.activeId);
+  if (!conversation) {
+    conversation = state.conversations.find((item) => !item.hidden) || state.conversations[0] || createConversation();
+    if (!state.conversations.length) state.conversations.push(conversation);
+    state.activeId = conversation.id;
+  }
   if (!conversation.documents) conversation.documents = [];
+  if (typeof conversation.hidden !== "boolean") conversation.hidden = false;
   let changed = false;
   conversation.documents.forEach((document) => {
     if (!document.chunks?.length && document.text) {
@@ -157,11 +162,16 @@ function renderConversationList() {
   conversationListEl.replaceChildren();
 
   [...state.conversations]
+    .filter((conversation) => state.showHidden || !conversation.hidden)
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .forEach((conversation) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `conversation-button${conversation.id === state.activeId ? " active" : ""}`;
+      button.className = [
+        "conversation-button",
+        conversation.id === state.activeId ? "active" : "",
+        conversation.hidden ? "is-hidden-chat" : ""
+      ].filter(Boolean).join(" ");
       button.textContent = conversation.title;
       button.addEventListener("click", () => {
         if (abortController) return;
@@ -195,7 +205,7 @@ function createMessageNode(message) {
 
     const image = document.createElement("img");
     image.className = "generated-image";
-    image.src = message.imageUrl;
+    image.src = message.image || message.imageUrl;
     image.alt = message.prompt || "Generated image";
 
     imageLink.append(image);
@@ -277,6 +287,9 @@ function renderAll() {
   statusEl.textContent = `${demoModeEl.checked ? "Demo mode" : "Ready"} on ${currentModel()}`;
   regenerateButton.disabled = !canRegenerate(conversation);
   deleteChatButton.disabled = state.conversations.length <= 1;
+  hideChatButton.textContent = conversation.hidden ? "Unhide" : "Hide";
+  showHiddenButton.textContent = state.showHidden ? "Shown" : "Hidden";
+  showHiddenButton.classList.toggle("active-tool", state.showHidden);
   renderConversationList();
   renderMessages();
   renderDocuments();
@@ -443,8 +456,8 @@ async function generateImageForConversation(prompt) {
   saveState();
   renderAll();
 
-  imageStatusEl.textContent = "Creating image...";
-  generateImageButton.disabled = true;
+  statusEl.textContent = "Creating image...";
+  sendButton.disabled = true;
 
   try {
     const response = await fetch("/api/images/generate", {
@@ -452,7 +465,6 @@ async function generateImageForConversation(prompt) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         prompt,
-        negativePrompt: negativePromptEl.value.trim(),
         width,
         height
       })
@@ -464,21 +476,14 @@ async function generateImageForConversation(prompt) {
       role: "assistant",
       content: `Generated image via ${result.provider}. Seed: ${result.seed}`,
       imageUrl: result.imageUrl,
+      image: result.image,
       prompt
     });
     conversation.updatedAt = Date.now();
     saveState();
     renderAll();
 
-    imageOutputEl.classList.remove("hidden");
-    imageOutputEl.replaceChildren();
-    const image = document.createElement("img");
-    image.src = result.imageUrl;
-    image.alt = prompt;
-    const meta = document.createElement("p");
-    meta.textContent = "Also added to the chat.";
-    imageOutputEl.append(image, meta);
-    imageStatusEl.textContent = "Image added to chat.";
+    statusEl.textContent = "Image added to chat.";
   } catch (error) {
     conversation.messages.push({
       role: "error",
@@ -486,9 +491,9 @@ async function generateImageForConversation(prompt) {
     });
     saveState();
     renderAll();
-    imageStatusEl.textContent = error.message;
+    statusEl.textContent = error.message;
   } finally {
-    generateImageButton.disabled = false;
+    sendButton.disabled = false;
   }
 }
 
@@ -571,6 +576,33 @@ deleteChatButton.addEventListener("click", () => {
   renderAll();
 });
 
+hideChatButton.addEventListener("click", () => {
+  if (abortController) return;
+  const conversation = activeConversation();
+  conversation.hidden = !conversation.hidden;
+  conversation.updatedAt = Date.now();
+
+  if (conversation.hidden && !state.showHidden) {
+    const nextConversation = state.conversations.find((item) => !item.hidden && item.id !== conversation.id);
+    if (nextConversation) {
+      state.activeId = nextConversation.id;
+    } else {
+      const freshConversation = createConversation();
+      state.conversations.unshift(freshConversation);
+      state.activeId = freshConversation.id;
+    }
+  }
+
+  saveState();
+  renderAll();
+});
+
+showHiddenButton.addEventListener("click", () => {
+  state.showHidden = !state.showHidden;
+  saveState();
+  renderAll();
+});
+
 exportChatButton.addEventListener("click", () => {
   const conversation = activeConversation();
   const lines = [
@@ -617,16 +649,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && document.body.classList.contains("focus-mode")) {
     setFocusMode(false);
   }
-});
-
-generateImageButton.addEventListener("click", async () => {
-  const prompt = imagePromptEl.value.trim();
-  if (!prompt) {
-    imageStatusEl.textContent = "Add an image prompt first.";
-    imagePromptEl.focus();
-    return;
-  }
-  await generateImageForConversation(prompt);
 });
 
 fileUploadEl.addEventListener("change", async () => {

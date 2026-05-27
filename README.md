@@ -41,6 +41,7 @@ You can type that model name into the app's model field if you want to try it, b
 - Saves multiple chats in your browser.
 - Lets you start a new chat without losing older conversations.
 - Lets you rename, delete, export, and regenerate chats.
+- Lets you hide individual chats from the sidebar and reveal them with **Hidden**.
 - Shows installed Ollama models in a picker.
 - Includes Focus mode to hide the sidebar/top chrome.
 - Adds chat-based non-explicit image generation with `/image your prompt`.
@@ -72,6 +73,6 @@ Type an image request directly in chat:
 /image cinematic photo of a futuristic desk assistant
 ```
 
-The image settings panel controls size and negative prompt. It uses a cloud image URL provider, so image prompts are sent outside your Mac.
+The image settings panel controls output size. It uses a cloud image URL provider, so image prompts are sent outside your Mac.
 
 The app does not require ComfyUI for image generation now.

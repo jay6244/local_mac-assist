@@ -241,14 +241,12 @@ async function handleGenerateImage(req, res) {
       return;
     }
 
-    const negativePrompt = String(body.negativePrompt || "low quality, blurry, distorted, watermark, text").trim();
     const width = Math.min(1280, Math.max(512, Number(body.width || 1024)));
     const height = Math.min(1280, Math.max(512, Number(body.height || 1024)));
     const seed = Number.isFinite(Number(body.seed)) && Number(body.seed) >= 0
       ? Number(body.seed)
       : Math.floor(Math.random() * 1_000_000_000);
-    const fullPrompt = negativePrompt ? `${prompt}. Avoid: ${negativePrompt}` : prompt;
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?${new URLSearchParams({
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${new URLSearchParams({
       width: String(width),
       height: String(height),
       seed: String(seed),
@@ -256,9 +254,19 @@ async function handleGenerateImage(req, res) {
       private: "true",
       safe: "true"
     })}`;
+    const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(120000) });
+
+    if (!imageResponse.ok) {
+      sendJson(res, 502, { error: "The image provider did not return an image." });
+      return;
+    }
+
+    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
     sendJson(res, 200, {
       imageUrl,
+      image: `data:${contentType};base64,${imageBuffer.toString("base64")}`,
       provider: "Pollinations",
       seed
     });
