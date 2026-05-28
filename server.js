@@ -358,6 +358,10 @@ function buildComfyWorkflow({ prompt, checkpoint, width, height, seed, uploadedI
 }
 
 function buildZImageWorkflow({ prompt, width, height, seed, uploadedImageName }) {
+  const maxSide = 512;
+  const scale = Math.min(1, maxSide / Math.max(width, height));
+  const outputWidth = Math.max(256, Math.round((width * scale) / 16) * 16);
+  const outputHeight = Math.max(256, Math.round((height * scale) / 16) * 16);
   const workflow = {
     "1": {
       class_type: "UNETLoader",
@@ -406,7 +410,7 @@ function buildZImageWorkflow({ prompt, width, height, seed, uploadedImageName })
       inputs: {
         model: ["1", 0],
         scheduler: "simple",
-        steps: 8,
+        steps: 4,
         denoise: 1
       }
     },
@@ -419,8 +423,8 @@ function buildZImageWorkflow({ prompt, width, height, seed, uploadedImageName })
     "9": {
       class_type: "EmptyLatentImage",
       inputs: {
-        width,
-        height,
+        width: outputWidth,
+        height: outputHeight,
         batch_size: 1
       }
     },
@@ -583,7 +587,7 @@ async function generateWithComfyUI({ prompt, checkpoint, width, height, seed, re
   const queued = await promptResponse.json();
   const promptId = queued.prompt_id;
 
-  for (let attempt = 0; attempt < 300; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     await sleep(1000);
     const historyResponse = await fetch(`${COMFYUI_URL}/history/${promptId}`);
     if (!historyResponse.ok) continue;
@@ -611,7 +615,8 @@ async function generateWithComfyUI({ prompt, checkpoint, width, height, seed, re
     }
   }
 
-  const error = new Error("ComfyUI did not finish the image within 5 minutes.");
+  await fetch(`${COMFYUI_URL}/interrupt`, { method: "POST" }).catch(() => {});
+  const error = new Error("ComfyUI did not finish within 2 minutes. Try 512 x 512, close other apps, or use Cloud fallback.");
   error.statusCode = 504;
   throw error;
 }

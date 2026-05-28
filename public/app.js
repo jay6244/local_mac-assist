@@ -54,14 +54,14 @@ function loadSettings() {
     const savedSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     return {
       imageProvider: savedSettings.imageProvider || "auto",
-      imageSize: savedSettings.imageSize || "1024x1024",
+      imageSize: savedSettings.imageSize || "512x512",
       checkpoint: savedSettings.checkpoint || "juggernautXL_v9Rdphoto2Lightning.safetensors",
       settingsOpen: false
     };
   } catch {
     return {
       imageProvider: "auto",
-      imageSize: "1024x1024",
+      imageSize: "512x512",
       checkpoint: "juggernautXL_v9Rdphoto2Lightning.safetensors",
       settingsOpen: false
     };
@@ -74,7 +74,12 @@ function saveSettings() {
 
 function applySettings() {
   imageProviderEl.value = settings.imageProvider || "auto";
-  imageSizeEl.value = settings.imageSize || "1024x1024";
+  imageSizeEl.value = settings.imageSize || "512x512";
+  if (!imageSizeEl.value || imageSizeEl.value === "1024x1024") {
+    imageSizeEl.value = "512x512";
+    settings.imageSize = "512x512";
+    saveSettings();
+  }
   checkpointNameEl.value = settings.checkpoint || "juggernautXL_v9Rdphoto2Lightning.safetensors";
   settingsPanelEl.classList.toggle("hidden", !settings.settingsOpen);
   settingsToggleButton.textContent = settings.settingsOpen ? "Close" : "Settings";
