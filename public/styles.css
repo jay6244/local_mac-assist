@@ -79,6 +79,63 @@ button:disabled {
   overflow: hidden;
 }
 
+.camera-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(18px);
+}
+
+.camera-sheet {
+  width: min(720px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(28, 30, 34, 0.96);
+  box-shadow: var(--shadow);
+}
+
+.camera-header,
+.camera-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.camera-header h2,
+.camera-kicker {
+  margin: 0;
+}
+
+.camera-header h2 {
+  font-size: 1.08rem;
+}
+
+.camera-kicker {
+  margin-bottom: 4px;
+  color: var(--success);
+  font-size: 0.68rem;
+  font-weight: 760;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.camera-preview {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #050608;
+}
+
 .app {
   width: min(1260px, 100%);
   height: min(850px, calc(100dvh - 44px));
@@ -486,7 +543,7 @@ h1 {
 
 .composer {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 10px;
   padding: 14px 18px 18px;
@@ -672,7 +729,7 @@ textarea:focus,
   }
 
   .composer {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
     padding: 12px;
   }
 
@@ -688,6 +745,7 @@ textarea:focus,
   }
 
   .attach-button,
+  #cameraButton,
   #send,
   #stop {
     width: 100%;

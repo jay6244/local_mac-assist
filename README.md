@@ -88,7 +88,7 @@ Open **Settings** only when you want to change the chat model, image size, image
 
 ## Image Style References
 
-Use **Attach** to upload a PNG, JPG, JPEG, or WebP image. The app saves it in the current chat as a style reference and reads simple local style notes such as composition, exposure, color temperature, and average color.
+Use **Attach** to upload a PNG, JPG, JPEG, or WebP image, or use **Camera** to take a new reference photo with your Mac camera. The app saves it in the current chat as a style reference and reads simple local style notes such as composition, exposure, color temperature, and average color.
 
 After attaching an image, ask for a new image normally:
 

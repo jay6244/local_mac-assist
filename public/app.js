@@ -24,6 +24,13 @@ const focusModeButton = document.querySelector("#focusMode");
 const exitFocusButton = document.querySelector("#exitFocus");
 const sendButton = document.querySelector("#send");
 const stopButton = document.querySelector("#stop");
+const cameraButton = document.querySelector("#cameraButton");
+const cameraModalEl = document.querySelector("#cameraModal");
+const cameraPreviewEl = document.querySelector("#cameraPreview");
+const cameraCanvasEl = document.querySelector("#cameraCanvas");
+const closeCameraButton = document.querySelector("#closeCamera");
+const capturePhotoButton = document.querySelector("#capturePhoto");
+const usePhotoButton = document.querySelector("#usePhoto");
 const fileUploadEl = document.querySelector("#fileUpload");
 const documentsEl = document.querySelector("#documents");
 const imageProviderEl = document.querySelector("#imageProvider");
@@ -35,6 +42,8 @@ const activeTitleEl = document.querySelector("#activeTitle");
 let abortController = null;
 let state = loadState();
 let settings = loadSettings();
+let cameraStream = null;
+let capturedPhotoDataUrl = "";
 
 function currentModel() {
   return modelEl.value || "llama3.2:3b";
@@ -384,6 +393,7 @@ function setLoading(isLoading) {
   demoModeEl.disabled = isLoading;
   modelEl.disabled = isLoading;
   fileUploadEl.disabled = isLoading;
+  cameraButton.disabled = isLoading;
   stopButton.classList.toggle("hidden", !isLoading);
   regenerateButton.disabled = isLoading || !canRegenerate(activeConversation());
   statusEl.textContent = isLoading ? "Thinking..." : demoModeEl.checked ? "Demo mode" : "Ready";
@@ -734,6 +744,84 @@ function analyzeImageStyle(dataUrl) {
   });
 }
 
+async function attachReferenceImage({ dataUrl, name, type, size = 0 }) {
+  const conversation = activeConversation();
+  const analysis = await analyzeImageStyle(dataUrl);
+  const referenceImage = {
+    id: crypto.randomUUID(),
+    name,
+    type,
+    size,
+    uploadedAt: Date.now(),
+    dataUrl,
+    width: analysis.width,
+    height: analysis.height,
+    styleNotes: analysis.notes
+  };
+
+  conversation.referenceImages.unshift(referenceImage);
+  conversation.updatedAt = Date.now();
+
+  if (conversation.title === "New chat") {
+    conversation.title = titleFromMessage(name);
+  }
+
+  conversation.messages.push({
+    role: "assistant",
+    content: `Attached **${name}** as a style reference.\n\nStyle read: ${analysis.notes}\n\nNow ask for an image and I will match this reference as closely as the selected image engine allows.`,
+    image: dataUrl,
+    prompt: name
+  });
+
+  saveState();
+  renderAll();
+}
+
+function stopCamera() {
+  cameraStream?.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  cameraPreviewEl.srcObject = null;
+}
+
+function closeCamera() {
+  stopCamera();
+  capturedPhotoDataUrl = "";
+  usePhotoButton.disabled = true;
+  cameraModalEl.classList.add("hidden");
+  promptEl.focus();
+}
+
+async function openCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Camera capture is not available in this browser.");
+  }
+
+  capturedPhotoDataUrl = "";
+  usePhotoButton.disabled = true;
+  cameraModalEl.classList.remove("hidden");
+  cameraStream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: "user",
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    },
+    audio: false
+  });
+  cameraPreviewEl.srcObject = cameraStream;
+  await cameraPreviewEl.play();
+}
+
+function captureCameraFrame() {
+  const width = cameraPreviewEl.videoWidth || 1280;
+  const height = cameraPreviewEl.videoHeight || 720;
+  cameraCanvasEl.width = width;
+  cameraCanvasEl.height = height;
+  const context = cameraCanvasEl.getContext("2d");
+  context.drawImage(cameraPreviewEl, 0, 0, width, height);
+  capturedPhotoDataUrl = cameraCanvasEl.toDataURL("image/jpeg", 0.92);
+  usePhotoButton.disabled = false;
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -899,35 +987,7 @@ fileUploadEl.addEventListener("change", async () => {
       const maxImageBytes = 8 * 1024 * 1024;
       if (file.size > maxImageBytes) throw new Error("Reference images must be 8 MB or smaller.");
       const dataUrl = await fileToDataUrl(file);
-      const analysis = await analyzeImageStyle(dataUrl);
-      const referenceImage = {
-        id: crypto.randomUUID(),
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        uploadedAt: Date.now(),
-        dataUrl,
-        width: analysis.width,
-        height: analysis.height,
-        styleNotes: analysis.notes
-      };
-
-      conversation.referenceImages.unshift(referenceImage);
-      conversation.updatedAt = Date.now();
-
-      if (conversation.title === "New chat") {
-        conversation.title = titleFromMessage(file.name);
-      }
-
-      conversation.messages.push({
-        role: "assistant",
-        content: `Attached **${file.name}** as a style reference.\n\nStyle read: ${analysis.notes}\n\nNow ask for an image and I will match this reference as closely as the selected image engine allows.`,
-        image: dataUrl,
-        prompt: file.name
-      });
-
-      saveState();
-      renderAll();
+      await attachReferenceImage({ dataUrl, name: file.name, type: file.type, size: file.size });
       return;
     }
 
@@ -975,6 +1035,61 @@ fileUploadEl.addEventListener("change", async () => {
     fileUploadEl.value = "";
     fileUploadEl.disabled = false;
     statusEl.textContent = demoModeEl.checked ? "Demo mode" : "Ready";
+  }
+});
+
+cameraButton.addEventListener("click", async () => {
+  if (abortController) return;
+  statusEl.textContent = "Opening camera...";
+  try {
+    await openCamera();
+    statusEl.textContent = "Camera ready";
+  } catch (error) {
+    closeCamera();
+    activeConversation().messages.push({
+      role: "error",
+      content: `${error.message}\n\nIf the browser asks for permission, allow camera access and try again.`
+    });
+    saveState();
+    renderAll();
+    statusEl.textContent = "Camera unavailable";
+  }
+});
+
+closeCameraButton.addEventListener("click", closeCamera);
+
+capturePhotoButton.addEventListener("click", () => {
+  try {
+    captureCameraFrame();
+    statusEl.textContent = "Photo captured";
+  } catch (error) {
+    activeConversation().messages.push({
+      role: "error",
+      content: error.message || "Could not capture a photo."
+    });
+    saveState();
+    renderAll();
+  }
+});
+
+usePhotoButton.addEventListener("click", async () => {
+  if (!capturedPhotoDataUrl) return;
+  statusEl.textContent = "Reading photo...";
+  try {
+    await attachReferenceImage({
+      dataUrl: capturedPhotoDataUrl,
+      name: `camera-reference-${new Date().toISOString().replace(/[:.]/g, "-")}.jpg`,
+      type: "image/jpeg"
+    });
+    closeCamera();
+    statusEl.textContent = "Photo attached";
+  } catch (error) {
+    activeConversation().messages.push({
+      role: "error",
+      content: error.message || "Could not use that photo."
+    });
+    saveState();
+    renderAll();
   }
 });
 
