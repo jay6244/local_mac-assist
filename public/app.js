@@ -698,16 +698,23 @@ async function generateImageForConversation(prompt) {
 
 function isNaturalImageRequest(text) {
   const normalized = text.toLowerCase();
+  const typoFriendly = normalized
+    .replace(/\breale\s*stic\b/g, "realistic")
+    .replace(/\breale?stic\b/g, "realistic")
+    .replace(/\bprtrait\b/g, "portrait");
   return (
-    /\b(generate|create|make|draw|show)\b/.test(normalized) &&
-    /\b(image|photo|picture|portrait|selfie|photograph)\b/.test(normalized)
+    /\b(generate|create|make|draw|show|give|need|want)\b/.test(typoFriendly) &&
+    /\b(image|photo|picture|portrait|selfie|photograph)\b/.test(typoFriendly)
   );
 }
 
 function imagePromptFromRequest(text) {
   return text
     .replace(/^\/image\s+/i, "")
-    .replace(/^(please\s+)?(generate|create|make|draw|show)\s+(me\s+)?(a|an|the)?\s*/i, "")
+    .replace(/\breale\s*stic\b/gi, "realistic")
+    .replace(/\breale?stic\b/gi, "realistic")
+    .replace(/\bprtrait\b/gi, "portrait")
+    .replace(/^(please\s+)?(generate|create|make|draw|show|give|need|want)\s+(me\s+)?(a|an|the)?\s*/i, "")
     .replace(/^(image|photo|picture|portrait|selfie|photograph)\s+(of\s+)?/i, "")
     .trim();
 }
