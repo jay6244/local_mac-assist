@@ -31,35 +31,35 @@
           <header class="topbar">
             <div class="chat-heading">
               <p id="activeTitle" class="chat-title">New chat</p>
-              <p id="status" class="status">Ready on llama3.2:3b</p>
+              <p id="status" class="status">Ready</p>
             </div>
             <div class="controls">
-              <label class="toggle">
-                <input id="demoMode" type="checkbox">
-                <span>Demo</span>
-              </label>
-              <select id="model" aria-label="Model name">
-                <option value="llama3.2:3b">llama3.2:3b</option>
-              </select>
+              <button id="settingsToggle" class="secondary-button" type="button" aria-label="Open settings">Settings</button>
               <button id="regenerate" class="secondary-button" type="button" aria-label="Regenerate response">Regenerate</button>
             </div>
           </header>
 
-          <div id="messages" class="messages" aria-live="polite"></div>
-          <section id="imagePanel" class="image-panel" aria-label="Image generation">
-            <div class="image-panel-header">
-              <div>
-                <p class="panel-kicker">Chat image mode</p>
-                <h2>Use /image, or ask for a photo</h2>
-              </div>
-              <label class="image-field">
-                <span>Provider</span>
+          <section id="settingsPanel" class="settings-panel hidden" aria-label="Assistant settings">
+            <div class="settings-grid">
+              <label class="toggle">
+                <input id="demoMode" type="checkbox">
+                <span>Demo</span>
+              </label>
+              <label class="setting-field">
+                <span>Chat model</span>
+                <select id="model" aria-label="Model name">
+                  <option value="llama3.2:3b">llama3.2:3b</option>
+                </select>
+              </label>
+              <label class="setting-field">
+                <span>Image engine</span>
                 <select id="imageProvider">
-                  <option value="comfyui">ComfyUI local</option>
+                  <option value="auto">Auto</option>
+                  <option value="comfyui">ComfyUI only</option>
                   <option value="cloud">Cloud fallback</option>
                 </select>
               </label>
-              <label class="image-field">
+              <label class="setting-field">
                 <span>Size</span>
                 <select id="imageSize">
                   <option value="1024x1024">1024 x 1024</option>
@@ -67,18 +67,20 @@
                   <option value="1216x832">1216 x 832</option>
                 </select>
               </label>
-              <label class="image-field checkpoint-field">
+              <label class="setting-field checkpoint-field">
                 <span>Checkpoint</span>
                 <input id="checkpointName" type="text" value="juggernautXL_v9Rdphoto2Lightning.safetensors" spellcheck="false">
               </label>
             </div>
           </section>
+
+          <div id="messages" class="messages" aria-live="polite"></div>
           <div id="documents" class="documents hidden" aria-label="Attached documents"></div>
 
           <form id="composer" class="composer">
             <label class="attach-button" for="fileUpload" aria-label="Attach document">Attach</label>
             <input id="fileUpload" class="file-input" type="file" accept=".pdf,.docx,.txt,.md,.csv,.json,.js,.ts,.tsx,.jsx,.html,.css,.py,.java,.sql,.log,text/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-            <textarea id="prompt" rows="1" placeholder="Ask anything..." autofocus></textarea>
+            <textarea id="prompt" rows="1" placeholder="Ask anything, or ask for a photo..." autofocus></textarea>
             <button id="stop" class="secondary-button hidden" type="button" aria-label="Stop response">Stop</button>
             <button id="send" type="submit" aria-label="Send message">
               <span>Send</span>

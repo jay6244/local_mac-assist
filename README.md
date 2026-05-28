@@ -1,6 +1,6 @@
 # Local Chatbot For M3 8 GB
 
-A lightweight browser chatbot that runs on your Mac and talks to Ollama locally.
+A lightweight browser chatbot that runs on your Mac, talks to Ollama for normal chat, and routes image requests automatically.
 
 ## Run The App
 
@@ -14,7 +14,7 @@ Open:
 http://localhost:3000
 ```
 
-Demo mode is available as a fallback, but the app now defaults to your local Ollama model.
+Demo mode and advanced model/image settings live behind **Settings**. For everyday use, just type in the chat box.
 
 ## Use A Local Model
 
@@ -25,7 +25,7 @@ ollama pull llama3.2:3b
 ollama serve
 ```
 
-Then turn off **Demo** in the app and send a message.
+Then send a message. Normal questions use Ollama automatically.
 
 You already have this Ollama model installed:
 
@@ -42,9 +42,9 @@ You can type that model name into the app's model field if you want to try it, b
 - Lets you start a new chat without losing older conversations.
 - Lets you rename, delete, export, and regenerate chats.
 - Lets you hide individual chats from the sidebar and reveal them with **Hidden**.
-- Shows installed Ollama models in a picker.
+- Keeps model and image settings tucked behind **Settings** so the main screen behaves like one bot.
 - Includes Focus mode to hide the sidebar/top chrome.
-- Adds chat-based non-explicit image generation with `/image your prompt`, using ComfyUI local or a cloud fallback.
+- Adds chat-based non-explicit image generation with `/image your prompt`, using Auto mode to try ComfyUI first and fall back to cloud.
 - Renders basic markdown, including inline code and fenced code blocks.
 - Includes a stop button while the model is responding.
 - Includes a copy button for assistant replies.
@@ -79,9 +79,9 @@ You can also ask naturally, for example:
 generate a realistic photo of a flying horse at golden hour
 ```
 
-The image settings panel controls provider, size, and checkpoint.
+By default, image generation is on **Auto**:
 
-- **ComfyUI local** sends prompts to `http://127.0.0.1:8188` and uses the checkpoint filename in the panel.
-- **Cloud fallback** uses a cloud image URL provider, so image prompts are sent outside your Mac.
+- If ComfyUI is reachable at `http://127.0.0.1:8188`, the app uses it.
+- If ComfyUI is not reachable, the app uses the cloud fallback.
 
-If your Juggernaut XL file has a different name, copy the exact checkpoint filename from ComfyUI into the checkpoint field.
+Open **Settings** only when you want to change the chat model, image size, image engine, or Juggernaut XL checkpoint filename.

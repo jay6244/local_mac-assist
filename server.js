@@ -425,20 +425,31 @@ async function handleGenerateImage(req, res) {
 
     const width = Math.min(1280, Math.max(512, Number(body.width || 1024)));
     const height = Math.min(1280, Math.max(512, Number(body.height || 1024)));
-    const provider = body.provider === "comfyui" ? "comfyui" : "cloud";
+    const provider = ["auto", "comfyui", "cloud"].includes(body.provider) ? body.provider : "auto";
     const checkpoint = String(body.checkpoint || "").trim() || "juggernautXL_v9Rdphoto2Lightning.safetensors";
     const seed = Number.isFinite(Number(body.seed)) && Number(body.seed) >= 0
       ? Number(body.seed)
       : Math.floor(Math.random() * 1_000_000_000);
     const enhancedPrompt = enhancePhotoPrompt(prompt);
-    const result = provider === "comfyui"
-      ? await generateWithComfyUI({ prompt: enhancedPrompt, checkpoint, width, height, seed })
-      : await generateWithCloud({ prompt: enhancedPrompt, width, height, seed });
+    let result;
+    let fallbackReason = "";
+    if (provider === "cloud") {
+      result = await generateWithCloud({ prompt: enhancedPrompt, width, height, seed });
+    } else {
+      try {
+        result = await generateWithComfyUI({ prompt: enhancedPrompt, checkpoint, width, height, seed });
+      } catch (error) {
+        if (provider === "comfyui") throw error;
+        fallbackReason = error.message;
+        result = await generateWithCloud({ prompt: enhancedPrompt, width, height, seed });
+      }
+    }
 
     sendJson(res, 200, {
       ...result,
       prompt: enhancedPrompt,
-      seed
+      seed,
+      fallbackReason
     });
   } catch (error) {
     sendJson(res, error.statusCode || 503, {

@@ -1,7 +1,8 @@
 const STORAGE_KEY = "m3-desk-companion:v2";
+const SETTINGS_KEY = "m3-desk-companion:settings-v3";
 const welcomeMessage = {
   role: "assistant",
-  content: "Hey, I am ready. I will use your local Ollama model unless Demo is turned on."
+  content: "Hey, I am ready. Ask me anything, or ask for a photo and I will route it to the image generator automatically."
 };
 
 const messagesEl = document.querySelector("#messages");
@@ -17,6 +18,8 @@ const exportChatButton = document.querySelector("#exportChat");
 const hideChatButton = document.querySelector("#hideChat");
 const showHiddenButton = document.querySelector("#showHidden");
 const regenerateButton = document.querySelector("#regenerate");
+const settingsToggleButton = document.querySelector("#settingsToggle");
+const settingsPanelEl = document.querySelector("#settingsPanel");
 const focusModeButton = document.querySelector("#focusMode");
 const exitFocusButton = document.querySelector("#exitFocus");
 const sendButton = document.querySelector("#send");
@@ -31,9 +34,41 @@ const activeTitleEl = document.querySelector("#activeTitle");
 
 let abortController = null;
 let state = loadState();
+let settings = loadSettings();
 
 function currentModel() {
   return modelEl.value || "llama3.2:3b";
+}
+
+function loadSettings() {
+  try {
+    return {
+      imageProvider: "auto",
+      imageSize: "1024x1024",
+      checkpoint: "juggernautXL_v9Rdphoto2Lightning.safetensors",
+      settingsOpen: false,
+      ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")
+    };
+  } catch {
+    return {
+      imageProvider: "auto",
+      imageSize: "1024x1024",
+      checkpoint: "juggernautXL_v9Rdphoto2Lightning.safetensors",
+      settingsOpen: false
+    };
+  }
+}
+
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function applySettings() {
+  imageProviderEl.value = settings.imageProvider || "auto";
+  imageSizeEl.value = settings.imageSize || "1024x1024";
+  checkpointNameEl.value = settings.checkpoint || "juggernautXL_v9Rdphoto2Lightning.safetensors";
+  settingsPanelEl.classList.toggle("hidden", !settings.settingsOpen);
+  settingsToggleButton.textContent = settings.settingsOpen ? "Close" : "Settings";
 }
 
 function createConversation() {
@@ -286,7 +321,7 @@ function renderDocuments() {
 function renderAll() {
   const conversation = activeConversation();
   activeTitleEl.textContent = conversation.title;
-  statusEl.textContent = `${demoModeEl.checked ? "Demo mode" : "Ready"} on ${currentModel()}`;
+  statusEl.textContent = demoModeEl.checked ? "Demo mode" : "Ready";
   regenerateButton.disabled = !canRegenerate(conversation);
   deleteChatButton.disabled = state.conversations.length <= 1;
   hideChatButton.textContent = conversation.hidden ? "Unhide" : "Hide";
@@ -305,7 +340,7 @@ function setLoading(isLoading) {
   fileUploadEl.disabled = isLoading;
   stopButton.classList.toggle("hidden", !isLoading);
   regenerateButton.disabled = isLoading || !canRegenerate(activeConversation());
-  statusEl.textContent = isLoading ? "Thinking..." : `${demoModeEl.checked ? "Demo mode" : "Ready"} on ${currentModel()}`;
+  statusEl.textContent = isLoading ? "Thinking..." : demoModeEl.checked ? "Demo mode" : "Ready";
 }
 
 function parseSseEvents(buffer) {
@@ -434,7 +469,7 @@ async function sendCurrentConversation() {
     if (error.name !== "AbortError") {
       conversation.messages.push({
         role: "error",
-        content: `${error.message}\n\nCheck that Ollama is running, or turn Demo on and try again.`
+        content: `${error.message}\n\nThe chat side uses Ollama. Images use the image engine automatically. If this keeps happening, start Ollama with \`ollama serve\` or turn Demo on in Settings.`
       });
     }
     saveState();
@@ -450,7 +485,7 @@ async function generateImageForConversation(prompt) {
   const conversation = activeConversation();
   const [width, height] = imageSizeEl.value.split("x").map(Number);
   const provider = imageProviderEl.value;
-  const providerLabel = provider === "comfyui" ? "ComfyUI" : "cloud fallback";
+  const providerLabel = provider === "comfyui" ? "ComfyUI" : provider === "cloud" ? "cloud fallback" : "auto image engine";
 
   conversation.messages.push({ role: "user", content: `/image ${prompt}` });
   conversation.updatedAt = Date.now();
@@ -478,9 +513,10 @@ async function generateImageForConversation(prompt) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Image generation failed.");
 
+    const fallbackNote = result.fallbackReason ? `\n\nComfyUI was not available, so I used the cloud fallback.` : "";
     conversation.messages.push({
       role: "assistant",
-      content: `Generated image via ${result.provider}. Seed: ${result.seed}`,
+      content: `Generated image via ${result.provider}. Seed: ${result.seed}${fallbackNote}`,
       imageUrl: result.imageUrl,
       image: result.image,
       prompt
@@ -649,10 +685,19 @@ regenerateButton.addEventListener("click", async () => {
   const conversation = activeConversation();
   const lastUserIndex = conversation.messages.map((message) => message.role).lastIndexOf("user");
   if (lastUserIndex === -1) return;
+  const lastUserMessage = conversation.messages[lastUserIndex].content;
   conversation.messages = conversation.messages.slice(0, lastUserIndex + 1);
   conversation.updatedAt = Date.now();
   saveState();
   renderAll();
+
+  if (lastUserMessage.toLowerCase().startsWith("/image ") || isNaturalImageRequest(lastUserMessage)) {
+    conversation.messages = conversation.messages.slice(0, lastUserIndex);
+    const imagePrompt = imagePromptFromRequest(lastUserMessage);
+    if (imagePrompt) await generateImageForConversation(imagePrompt);
+    return;
+  }
+
   await sendCurrentConversation();
 });
 
@@ -726,12 +771,26 @@ fileUploadEl.addEventListener("change", async () => {
   } finally {
     fileUploadEl.value = "";
     fileUploadEl.disabled = false;
-    statusEl.textContent = `${demoModeEl.checked ? "Demo mode" : "Ready"} on ${currentModel()}`;
+    statusEl.textContent = demoModeEl.checked ? "Demo mode" : "Ready";
   }
 });
 
 demoModeEl.addEventListener("change", renderAll);
 modelEl.addEventListener("input", renderAll);
+settingsToggleButton.addEventListener("click", () => {
+  settings.settingsOpen = !settings.settingsOpen;
+  saveSettings();
+  applySettings();
+});
+
+[imageProviderEl, imageSizeEl, checkpointNameEl].forEach((control) => {
+  control.addEventListener("input", () => {
+    settings.imageProvider = imageProviderEl.value;
+    settings.imageSize = imageSizeEl.value;
+    settings.checkpoint = checkpointNameEl.value.trim();
+    saveSettings();
+  });
+});
 
 async function loadModels() {
   try {
@@ -754,5 +813,6 @@ async function loadModels() {
   }
 }
 
+applySettings();
 renderAll();
 loadModels();
