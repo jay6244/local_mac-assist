@@ -42,12 +42,12 @@ function currentModel() {
 
 function loadSettings() {
   try {
+    const savedSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     return {
-      imageProvider: "auto",
-      imageSize: "1024x1024",
-      checkpoint: "juggernautXL_v9Rdphoto2Lightning.safetensors",
-      settingsOpen: false,
-      ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")
+      imageProvider: savedSettings.imageProvider || "auto",
+      imageSize: savedSettings.imageSize || "1024x1024",
+      checkpoint: savedSettings.checkpoint || "juggernautXL_v9Rdphoto2Lightning.safetensors",
+      settingsOpen: false
     };
   } catch {
     return {
@@ -779,7 +779,6 @@ demoModeEl.addEventListener("change", renderAll);
 modelEl.addEventListener("input", renderAll);
 settingsToggleButton.addEventListener("click", () => {
   settings.settingsOpen = !settings.settingsOpen;
-  saveSettings();
   applySettings();
 });
 

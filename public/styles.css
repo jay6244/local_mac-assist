@@ -1,40 +1,40 @@
 :root {
   color-scheme: dark;
-  --bg: #0d1112;
-  --surface: #121819;
-  --surface-2: #192123;
-  --surface-3: #202a2d;
-  --field: #0f1516;
-  --text: #edf4f2;
-  --muted: #9fafab;
-  --faint: #71807d;
-  --line: #2e3b3e;
-  --line-strong: #465a5e;
-  --accent: #f2c14e;
-  --accent-2: #58c4b6;
-  --accent-3: #9ab7ff;
-  --danger: #ff8a6b;
+  --bg: #0b0d10;
+  --window: rgba(28, 30, 34, 0.9);
+  --panel: rgba(34, 37, 42, 0.74);
+  --panel-soft: rgba(255, 255, 255, 0.045);
+  --field: rgba(12, 14, 17, 0.72);
+  --text: #f5f5f7;
+  --muted: #a1a1a6;
+  --faint: #77777f;
+  --line: rgba(255, 255, 255, 0.105);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --accent: #0a84ff;
+  --accent-soft: rgba(10, 132, 255, 0.14);
+  --success: #63d297;
+  --danger: #ff6b5f;
+  --shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
 }
 
 * {
   box-sizing: border-box;
 }
 
-html {
+html,
+body {
   height: 100%;
   overflow: hidden;
 }
 
 body {
   margin: 0;
-  height: 100%;
-  overflow: hidden;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif;
   background:
-    linear-gradient(145deg, rgba(88, 196, 182, 0.1), transparent 34%),
-    linear-gradient(315deg, rgba(242, 193, 78, 0.1), transparent 38%),
-    var(--bg);
+    linear-gradient(180deg, #15181d 0%, #0b0d10 48%, #090a0c 100%);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -48,25 +48,25 @@ button,
 select,
 textarea,
 .attach-button {
-  transition: border-color 140ms ease, background 140ms ease, opacity 140ms ease, transform 140ms ease;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease, opacity 150ms ease;
 }
 
 button {
   border: 0;
   border-radius: 8px;
-  color: #15130e;
-  background: var(--accent);
-  font-weight: 800;
+  color: var(--text);
+  background: var(--panel-soft);
+  font-weight: 650;
   cursor: pointer;
 }
 
 button:hover:not(:disabled),
 .attach-button:hover {
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.085);
 }
 
 button:disabled {
-  opacity: 0.46;
+  opacity: 0.42;
   cursor: not-allowed;
 }
 
@@ -75,21 +75,22 @@ button:disabled {
   min-height: 0;
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: 22px;
   overflow: hidden;
 }
 
 .app {
-  width: min(1240px, 100%);
-  height: min(860px, calc(100dvh - 32px));
+  width: min(1260px, 100%);
+  height: min(850px, calc(100dvh - 44px));
   min-height: 0;
   display: grid;
-  grid-template-columns: 286px minmax(0, 1fr);
+  grid-template-columns: 270px minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid rgba(154, 183, 255, 0.12);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(18, 24, 25, 0.96);
-  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.36);
+  background: var(--window);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(28px) saturate(1.35);
 }
 
 .sidebar {
@@ -98,29 +99,29 @@ button:disabled {
   display: grid;
   grid-template-rows: auto auto auto 1fr;
   gap: 14px;
-  padding: 20px;
+  padding: 18px;
   border-right: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(15, 21, 22, 0.98), rgba(18, 24, 25, 0.96));
+  background: rgba(18, 20, 23, 0.64);
 }
 
 .brand {
   min-width: 0;
-  padding-bottom: 6px;
+  padding: 2px 2px 8px;
 }
 
 .eyebrow {
-  margin: 0 0 8px;
-  color: var(--accent-2);
-  font-size: 0.74rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+  color: var(--success);
+  font-size: 0.66rem;
+  font-weight: 760;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 h1 {
   margin: 0;
-  font-size: 1.55rem;
-  line-height: 1.05;
+  font-size: 1.32rem;
+  line-height: 1.08;
   letter-spacing: 0;
 }
 
@@ -130,18 +131,13 @@ h1 {
 .attach-button {
   border: 1px solid var(--line);
   color: var(--text);
-  background: var(--surface-2);
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .primary-rail-button {
-  min-height: 46px;
-  background: linear-gradient(180deg, rgba(88, 196, 182, 0.18), rgba(88, 196, 182, 0.1));
-  border-color: rgba(88, 196, 182, 0.34);
-}
-
-.secondary-button {
-  min-height: 40px;
-  padding: 0 13px;
+  min-height: 44px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.94rem;
 }
 
 .chat-actions {
@@ -150,18 +146,22 @@ h1 {
   gap: 8px;
 }
 
+.secondary-button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
 .icon-button {
-  min-height: 34px;
+  min-height: 32px;
   padding: 0 8px;
   color: var(--muted);
-  background: transparent;
-  font-size: 0.76rem;
-  font-weight: 800;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.74rem;
 }
 
 .danger-button {
-  color: #ffd6ca;
-  border-color: rgba(255, 138, 107, 0.32);
+  color: #ffb5ad;
+  border-color: rgba(255, 107, 95, 0.28);
 }
 
 .conversation-list {
@@ -169,19 +169,20 @@ h1 {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   padding-right: 2px;
 }
 
 .conversation-button {
   width: 100%;
-  min-height: 42px;
+  min-height: 40px;
   padding: 10px 12px;
   border: 1px solid transparent;
   border-radius: 8px;
   color: var(--muted);
   background: transparent;
-  font-weight: 700;
+  font-size: 0.91rem;
+  font-weight: 620;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -189,13 +190,14 @@ h1 {
 }
 
 .conversation-button:hover {
-  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .conversation-button.active {
-  border-color: rgba(88, 196, 182, 0.42);
+  border-color: rgba(10, 132, 255, 0.26);
   color: var(--text);
-  background: rgba(88, 196, 182, 0.12);
+  background: var(--accent-soft);
 }
 
 .conversation-button.is-hidden-chat {
@@ -204,9 +206,9 @@ h1 {
 }
 
 .active-tool {
-  border-color: rgba(88, 196, 182, 0.42);
+  border-color: rgba(10, 132, 255, 0.34);
   color: var(--text);
-  background: rgba(88, 196, 182, 0.1);
+  background: var(--accent-soft);
 }
 
 .chat {
@@ -214,7 +216,7 @@ h1 {
   min-height: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-  background: rgba(13, 17, 18, 0.34);
+  background: rgba(14, 16, 18, 0.44);
 }
 
 .topbar {
@@ -223,9 +225,9 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 18px 22px;
+  padding: 16px 22px;
   border-bottom: 1px solid var(--line);
-  background: rgba(25, 33, 35, 0.8);
+  background: rgba(24, 26, 30, 0.7);
 }
 
 .chat-heading {
@@ -233,12 +235,12 @@ h1 {
 }
 
 .chat-title {
-  margin: 0 0 5px;
+  margin: 0 0 4px;
   max-width: 42vw;
   overflow: hidden;
   color: var(--text);
-  font-size: 1.08rem;
-  font-weight: 850;
+  font-size: 1rem;
+  font-weight: 720;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -246,19 +248,19 @@ h1 {
 .status {
   margin: 0;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .controls {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
 .toggle {
-  min-height: 38px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -267,7 +269,7 @@ h1 {
   border-radius: 8px;
   color: var(--muted);
   background: var(--field);
-  font-weight: 700;
+  font-weight: 620;
 }
 
 .toggle input {
@@ -278,29 +280,25 @@ h1 {
 #imageProvider,
 #imageSize,
 #checkpointName {
-  width: min(188px, 42vw);
-  min-height: 38px;
-  padding: 0 34px 0 12px;
+  width: min(190px, 42vw);
+  min-height: 36px;
+  padding: 0 32px 0 11px;
   border: 1px solid var(--line);
   border-radius: 8px;
   outline: none;
   background: var(--field);
   color: var(--text);
-  font-weight: 750;
+  font-weight: 620;
 }
 
 #checkpointName {
   width: 100%;
 }
 
-#regenerate {
-  min-height: 38px;
-}
-
 .settings-panel {
   padding: 12px 22px;
   border-bottom: 1px solid var(--line);
-  background: rgba(15, 21, 22, 0.92);
+  background: rgba(16, 18, 21, 0.8);
 }
 
 .settings-grid {
@@ -318,8 +316,8 @@ h1 {
 
 .setting-field span {
   color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
+  font-size: 0.72rem;
+  font-weight: 680;
 }
 
 .messages {
@@ -328,37 +326,38 @@ h1 {
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 22px;
+  gap: 12px;
+  padding: 22px 26px;
   scroll-behavior: smooth;
 }
 
 .message {
   position: relative;
-  width: min(780px, 94%);
-  padding: 14px 16px;
+  width: min(760px, 94%);
+  padding: 13px 15px;
   border: 1px solid var(--line);
   border-radius: 8px;
   line-height: 1.55;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+  font-size: 0.96rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
 }
 
 .message.assistant {
   align-self: flex-start;
-  background: var(--surface-2);
+  background: rgba(255, 255, 255, 0.065);
 }
 
 .message.user {
   align-self: flex-end;
-  border-color: rgba(88, 196, 182, 0.42);
-  background: #213032;
+  border-color: rgba(10, 132, 255, 0.32);
+  background: rgba(10, 132, 255, 0.18);
 }
 
 .message.error {
   align-self: flex-start;
-  color: #ffe9df;
-  border-color: rgba(255, 138, 107, 0.6);
-  background: rgba(255, 138, 107, 0.1);
+  color: #ffd8d3;
+  border-color: rgba(255, 107, 95, 0.42);
+  background: rgba(255, 107, 95, 0.11);
 }
 
 .message-body {
@@ -371,14 +370,14 @@ h1 {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #090d0e;
+  background: rgba(0, 0, 0, 0.34);
 }
 
 .message-body code {
   padding: 2px 5px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.28);
-  color: #fff0bb;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f5f5f7;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 0.92em;
 }
@@ -400,27 +399,26 @@ h1 {
   object-fit: contain;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #090d0e;
+  background: rgba(0, 0, 0, 0.28);
 }
 
 .copy-button {
-  min-height: 28px;
+  min-height: 26px;
   margin-top: 10px;
   padding: 0 10px;
   border: 1px solid var(--line);
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.02);
-  font-size: 0.76rem;
-  font-weight: 850;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.72rem;
 }
 
 .documents {
   display: flex;
   gap: 10px;
   overflow-x: auto;
-  padding: 10px 16px;
+  padding: 10px 18px;
   border-top: 1px solid var(--line);
-  background: rgba(18, 24, 25, 0.92);
+  background: rgba(18, 20, 23, 0.76);
 }
 
 .document-chip {
@@ -431,9 +429,9 @@ h1 {
   justify-content: space-between;
   gap: 10px;
   padding: 10px;
-  border: 1px solid rgba(154, 183, 255, 0.28);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(154, 183, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .document-detail {
@@ -451,12 +449,12 @@ h1 {
 
 .document-detail strong {
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
 }
 
 .document-detail span {
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
 }
 
 .remove-document {
@@ -466,8 +464,7 @@ h1 {
   border: 1px solid var(--line);
   color: var(--muted);
   background: transparent;
-  font-size: 0.76rem;
-  font-weight: 800;
+  font-size: 0.74rem;
 }
 
 .composer {
@@ -475,20 +472,20 @@ h1 {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 10px;
-  padding: 16px 18px 18px;
+  padding: 14px 18px 18px;
   border-top: 1px solid var(--line);
-  background: rgba(25, 33, 35, 0.88);
+  background: rgba(20, 22, 25, 0.82);
 }
 
 .attach-button {
   min-width: 78px;
-  min-height: 52px;
+  min-height: 48px;
   display: inline-grid;
   place-items: center;
   padding: 0 13px;
   border-radius: 8px;
   color: var(--text);
-  font-weight: 850;
+  font-weight: 660;
   cursor: pointer;
 }
 
@@ -498,16 +495,20 @@ h1 {
 
 textarea {
   width: 100%;
-  min-height: 52px;
+  min-height: 48px;
   max-height: 168px;
   resize: vertical;
-  padding: 14px 15px;
+  padding: 13px 14px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   outline: none;
-  background: var(--field);
+  background: rgba(7, 9, 12, 0.72);
   color: var(--text);
   line-height: 1.35;
+}
+
+textarea::placeholder {
+  color: #8e8e93;
 }
 
 textarea:focus,
@@ -515,20 +516,29 @@ textarea:focus,
 #imageProvider:focus,
 #imageSize:focus,
 #checkpointName:focus {
-  border-color: var(--accent-2);
-  box-shadow: 0 0 0 3px rgba(88, 196, 182, 0.16);
+  border-color: rgba(10, 132, 255, 0.8);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.18);
 }
 
 #send,
 #stop {
-  min-width: 82px;
-  min-height: 52px;
+  min-width: 80px;
+  min-height: 48px;
+}
+
+#send {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+#send:hover:not(:disabled) {
+  background: #2997ff;
 }
 
 #stop {
-  color: #ffe9df;
-  border-color: rgba(255, 138, 107, 0.5);
-  background: rgba(255, 138, 107, 0.12);
+  color: #ffd8d3;
+  border-color: rgba(255, 107, 95, 0.36);
+  background: rgba(255, 107, 95, 0.12);
 }
 
 .hidden {
@@ -540,11 +550,11 @@ textarea:focus,
   z-index: 10;
   top: 14px;
   right: 14px;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 13px;
   border: 1px solid var(--line);
   color: var(--text);
-  background: var(--surface-2);
+  background: rgba(34, 37, 42, 0.86);
 }
 
 .focus-mode .app {
@@ -585,7 +595,7 @@ textarea:focus,
   }
 
   h1 {
-    font-size: 1.24rem;
+    font-size: 1.16rem;
   }
 
   .primary-rail-button {
