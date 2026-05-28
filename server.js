@@ -9,7 +9,7 @@ const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = join(process.cwd(), "public");
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
-const COMFYUI_URL = process.env.COMFYUI_URL || "http://127.0.0.1:8188";
+const COMFYUI_URL = process.env.COMFYUI_URL || "http://127.0.0.1:8000";
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const MAX_REFERENCE_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_EXTRACTED_CHARS = 45000;
@@ -357,6 +357,146 @@ function buildComfyWorkflow({ prompt, checkpoint, width, height, seed, uploadedI
   return workflow;
 }
 
+function buildZImageWorkflow({ prompt, width, height, seed, uploadedImageName }) {
+  const workflow = {
+    "1": {
+      class_type: "UNETLoader",
+      inputs: {
+        unet_name: "z_image_turbo_bf16.safetensors",
+        weight_dtype: "default"
+      }
+    },
+    "2": {
+      class_type: "CLIPLoader",
+      inputs: {
+        clip_name: "qwen_3_4b.safetensors",
+        type: "qwen_image"
+      }
+    },
+    "3": {
+      class_type: "VAELoader",
+      inputs: {
+        vae_name: "ae.safetensors"
+      }
+    },
+    "4": {
+      class_type: "TextEncodeZImageOmni",
+      inputs: {
+        clip: ["2", 0],
+        prompt,
+        auto_resize_images: true,
+        vae: ["3", 0]
+      }
+    },
+    "5": {
+      class_type: "BasicGuider",
+      inputs: {
+        model: ["1", 0],
+        conditioning: ["4", 0]
+      }
+    },
+    "6": {
+      class_type: "RandomNoise",
+      inputs: {
+        noise_seed: seed
+      }
+    },
+    "7": {
+      class_type: "BasicScheduler",
+      inputs: {
+        model: ["1", 0],
+        scheduler: "simple",
+        steps: 8,
+        denoise: 1
+      }
+    },
+    "8": {
+      class_type: "KSamplerSelect",
+      inputs: {
+        sampler_name: "euler"
+      }
+    },
+    "9": {
+      class_type: "EmptyLatentImage",
+      inputs: {
+        width,
+        height,
+        batch_size: 1
+      }
+    },
+    "10": {
+      class_type: "SamplerCustomAdvanced",
+      inputs: {
+        noise: ["6", 0],
+        guider: ["5", 0],
+        sampler: ["8", 0],
+        sigmas: ["7", 0],
+        latent_image: ["9", 0]
+      }
+    },
+    "11": {
+      class_type: "VAEDecode",
+      inputs: {
+        samples: ["10", 0],
+        vae: ["3", 0]
+      }
+    },
+    "12": {
+      class_type: "SaveImage",
+      inputs: {
+        filename_prefix: "local_mac_assist_zimage",
+        images: ["11", 0]
+      }
+    }
+  };
+
+  if (uploadedImageName) {
+    workflow["13"] = {
+      class_type: "LoadImage",
+      inputs: {
+        image: uploadedImageName
+      }
+    };
+    workflow["4"].inputs.image1 = ["13", 0];
+  }
+
+  return workflow;
+}
+
+async function getComfyObjectInfo(nodeName) {
+  const response = await fetch(`${COMFYUI_URL}/object_info/${nodeName}`);
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data[nodeName] || null;
+}
+
+async function buildAvailableComfyWorkflow({ prompt, checkpoint, width, height, seed, uploadedImageName }) {
+  const checkpointInfo = await getComfyObjectInfo("CheckpointLoaderSimple");
+  const checkpoints = checkpointInfo?.input?.required?.ckpt_name?.[0] || [];
+  if (checkpoints.includes(checkpoint)) {
+    return buildComfyWorkflow({ prompt, checkpoint, width, height, seed, uploadedImageName });
+  }
+
+  const unetInfo = await getComfyObjectInfo("UNETLoader");
+  const clipInfo = await getComfyObjectInfo("CLIPLoader");
+  const vaeInfo = await getComfyObjectInfo("VAELoader");
+  const unets = unetInfo?.input?.required?.unet_name?.[0] || [];
+  const clips = clipInfo?.input?.required?.clip_name?.[0] || [];
+  const vaes = vaeInfo?.input?.required?.vae_name?.[0] || [];
+
+  if (
+    unets.includes("z_image_turbo_bf16.safetensors") &&
+    clips.includes("qwen_3_4b.safetensors") &&
+    vaes.includes("ae.safetensors")
+  ) {
+    return buildZImageWorkflow({ prompt, width, height, seed, uploadedImageName });
+  }
+
+  const error = new Error("ComfyUI does not have a usable checkpoint or Z-Image model installed.");
+  error.statusCode = 502;
+  throw error;
+}
+
 async function generateWithCloud({ prompt, width, height, seed }) {
   const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${new URLSearchParams({
     width: String(width),
@@ -418,12 +558,13 @@ async function generateWithComfyUI({ prompt, checkpoint, width, height, seed, re
   let promptResponse;
   try {
     const uploadedImageName = await uploadComfyReferenceImage(referenceImage);
+    const workflow = await buildAvailableComfyWorkflow({ prompt, checkpoint, width, height, seed, uploadedImageName });
     promptResponse = await fetch(`${COMFYUI_URL}/prompt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         client_id: randomUUID(),
-        prompt: buildComfyWorkflow({ prompt, checkpoint, width, height, seed, uploadedImageName })
+        prompt: workflow
       })
     });
   } catch (error) {

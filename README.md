@@ -81,7 +81,7 @@ generate a realistic photo of a flying horse at golden hour
 
 By default, image generation is on **Auto**:
 
-- If ComfyUI is reachable at `http://127.0.0.1:8188`, the app uses it.
+- If ComfyUI is reachable at `http://127.0.0.1:8000`, the app uses it. You can override this with `COMFYUI_URL` if your ComfyUI uses another port.
 - If ComfyUI is not reachable, the app uses the cloud fallback.
 
 Open **Settings** only when you want to change the chat model, image size, image engine, or Juggernaut XL checkpoint filename.
