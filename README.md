@@ -85,3 +85,15 @@ By default, image generation is on **Auto**:
 - If ComfyUI is not reachable, the app uses the cloud fallback.
 
 Open **Settings** only when you want to change the chat model, image size, image engine, or Juggernaut XL checkpoint filename.
+
+## Image Style References
+
+Use **Attach** to upload a PNG, JPG, JPEG, or WebP image. The app saves it in the current chat as a style reference and reads simple local style notes such as composition, exposure, color temperature, and average color.
+
+After attaching an image, ask for a new image normally:
+
+```txt
+generate a realistic photo in this same style
+```
+
+When ComfyUI is reachable, Auto mode uploads the reference image to ComfyUI and uses it in the image workflow. If Auto falls back to cloud generation, it uses the style notes from the reference image but cannot use the image pixels directly.

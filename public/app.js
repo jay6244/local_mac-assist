@@ -79,6 +79,7 @@ function createConversation() {
     updatedAt: Date.now(),
     hidden: false,
     documents: [],
+    referenceImages: [],
     messages: [{ ...welcomeMessage }]
   };
 }
@@ -111,6 +112,7 @@ function activeConversation() {
     state.activeId = conversation.id;
   }
   if (!conversation.documents) conversation.documents = [];
+  if (!conversation.referenceImages) conversation.referenceImages = [];
   if (typeof conversation.hidden !== "boolean") conversation.hidden = false;
   let changed = false;
   conversation.documents.forEach((document) => {
@@ -249,6 +251,14 @@ function createMessageNode(message) {
     node.append(imageLink);
   }
 
+  if (message.image && !message.imageUrl) {
+    const image = document.createElement("img");
+    image.className = "generated-image reference-preview";
+    image.src = message.image;
+    image.alt = message.prompt || "Uploaded reference image";
+    node.append(image);
+  }
+
   if (message.role === "assistant" && message.content.trim()) {
     const copyButton = document.createElement("button");
     copyButton.className = "copy-button";
@@ -283,8 +293,44 @@ function renderMessages() {
 
 function renderDocuments() {
   const documents = activeConversation().documents || [];
-  documentsEl.classList.toggle("hidden", documents.length === 0);
+  const referenceImages = activeConversation().referenceImages || [];
+  documentsEl.classList.toggle("hidden", documents.length === 0 && referenceImages.length === 0);
   documentsEl.replaceChildren();
+
+  referenceImages.forEach((referenceImage) => {
+    const chip = document.createElement("article");
+    chip.className = "document-chip image-chip";
+
+    const preview = document.createElement("img");
+    preview.src = referenceImage.dataUrl;
+    preview.alt = referenceImage.name;
+
+    const detail = document.createElement("div");
+    detail.className = "document-detail";
+
+    const title = document.createElement("strong");
+    title.textContent = referenceImage.name;
+
+    const meta = document.createElement("span");
+    meta.textContent = "Style reference";
+
+    detail.append(title, meta);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "remove-document";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", () => {
+      const conversation = activeConversation();
+      conversation.referenceImages = conversation.referenceImages.filter((item) => item.id !== referenceImage.id);
+      conversation.updatedAt = Date.now();
+      saveState();
+      renderAll();
+    });
+
+    chip.append(preview, detail, remove);
+    documentsEl.append(chip);
+  });
 
   documents.forEach((attachedDocument) => {
     const chip = document.createElement("article");
@@ -412,6 +458,10 @@ function buildModelMessages(conversation) {
   ];
 }
 
+function latestReferenceImage(conversation) {
+  return [...(conversation.referenceImages || [])].sort((a, b) => b.uploadedAt - a.uploadedAt)[0] || null;
+}
+
 async function streamAssistantReply(conversation) {
   abortController = new AbortController();
   const response = await fetch("/api/chat/stream", {
@@ -524,6 +574,10 @@ async function generateImageForConversation(prompt) {
   const [width, height] = imageSizeEl.value.split("x").map(Number);
   const provider = imageProviderEl.value;
   const providerLabel = provider === "comfyui" ? "ComfyUI" : provider === "cloud" ? "cloud fallback" : "auto image engine";
+  const referenceImage = latestReferenceImage(conversation);
+  const referencePrompt = referenceImage
+    ? `${prompt}. Match the uploaded reference image style: ${referenceImage.styleNotes}`
+    : prompt;
 
   conversation.messages.push({ role: "user", content: `/image ${prompt}` });
   conversation.updatedAt = Date.now();
@@ -541,20 +595,32 @@ async function generateImageForConversation(prompt) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        prompt,
+        prompt: referencePrompt,
         width,
         height,
         provider,
-        checkpoint: checkpointNameEl.value.trim()
+        checkpoint: checkpointNameEl.value.trim(),
+        referenceImage: referenceImage
+          ? {
+              name: referenceImage.name,
+              type: referenceImage.type,
+              dataUrl: referenceImage.dataUrl
+            }
+          : null
       })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Image generation failed.");
 
     const fallbackNote = result.fallbackReason ? `\n\nComfyUI was not available, so I used the cloud fallback.` : "";
+    const referenceNote = referenceImage
+      ? result.usedReference
+        ? `\n\nUsed **${referenceImage.name}** as the style reference.`
+        : `\n\nI used the uploaded image's style notes, but this provider could not use the image pixels directly.`
+      : "";
     conversation.messages.push({
       role: "assistant",
-      content: `Generated image via ${result.provider}. Seed: ${result.seed}${fallbackNote}`,
+      content: `Generated image via ${result.provider}. Seed: ${result.seed}${fallbackNote}${referenceNote}`,
       imageUrl: result.imageUrl,
       image: result.image,
       prompt
@@ -603,6 +669,68 @@ function fileToBase64(file) {
     });
     reader.addEventListener("error", () => reject(reader.error));
     reader.readAsDataURL(file);
+  });
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsDataURL(file);
+  });
+}
+
+function analyzeImageStyle(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => {
+      const canvas = document.createElement("canvas");
+      const sampleSize = 64;
+      canvas.width = sampleSize;
+      canvas.height = sampleSize;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      context.drawImage(image, 0, 0, sampleSize, sampleSize);
+      const { data } = context.getImageData(0, 0, sampleSize, sampleSize);
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      let brightness = 0;
+      let warmPixels = 0;
+      let saturatedPixels = 0;
+      const pixels = sampleSize * sampleSize;
+
+      for (let index = 0; index < data.length; index += 4) {
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        red += r;
+        green += g;
+        blue += b;
+        brightness += (r + g + b) / 3;
+        if (r > b + 18) warmPixels += 1;
+        if (Math.max(r, g, b) - Math.min(r, g, b) > 58) saturatedPixels += 1;
+      }
+
+      const average = {
+        red: Math.round(red / pixels),
+        green: Math.round(green / pixels),
+        blue: Math.round(blue / pixels),
+        brightness: Math.round(brightness / pixels)
+      };
+      const aspect = image.width > image.height ? "landscape" : image.width < image.height ? "portrait" : "square";
+      const mood = average.brightness > 170 ? "bright" : average.brightness < 85 ? "low-key" : "balanced";
+      const temperature = warmPixels > pixels * 0.48 ? "warm" : warmPixels < pixels * 0.28 ? "cool" : "neutral";
+      const saturation = saturatedPixels > pixels * 0.42 ? "vivid" : saturatedPixels < pixels * 0.18 ? "muted" : "natural";
+
+      resolve({
+        width: image.width,
+        height: image.height,
+        notes: `${aspect} composition, ${mood} exposure, ${temperature} color temperature, ${saturation} colors, average RGB ${average.red}/${average.green}/${average.blue}`
+      });
+    });
+    image.addEventListener("error", () => reject(new Error("Could not read that image.")));
+    image.src = dataUrl;
   });
 }
 
@@ -706,6 +834,7 @@ exportChatButton.addEventListener("click", () => {
     `# ${conversation.title}`,
     "",
     ...(conversation.documents || []).map((document) => `Attached document: ${document.name}`),
+    ...(conversation.referenceImages || []).map((image) => `Attached style reference: ${image.name} (${image.styleNotes})`),
     "",
     ...conversation.messages.map((message) => `## ${message.role}\n\n${message.content}`)
   ];
@@ -766,6 +895,42 @@ fileUploadEl.addEventListener("change", async () => {
   fileUploadEl.disabled = true;
 
   try {
+    if (file.type.startsWith("image/")) {
+      const maxImageBytes = 8 * 1024 * 1024;
+      if (file.size > maxImageBytes) throw new Error("Reference images must be 8 MB or smaller.");
+      const dataUrl = await fileToDataUrl(file);
+      const analysis = await analyzeImageStyle(dataUrl);
+      const referenceImage = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        uploadedAt: Date.now(),
+        dataUrl,
+        width: analysis.width,
+        height: analysis.height,
+        styleNotes: analysis.notes
+      };
+
+      conversation.referenceImages.unshift(referenceImage);
+      conversation.updatedAt = Date.now();
+
+      if (conversation.title === "New chat") {
+        conversation.title = titleFromMessage(file.name);
+      }
+
+      conversation.messages.push({
+        role: "assistant",
+        content: `Attached **${file.name}** as a style reference.\n\nStyle read: ${analysis.notes}\n\nNow ask for an image and I will match this reference as closely as the selected image engine allows.`,
+        image: dataUrl,
+        prompt: file.name
+      });
+
+      saveState();
+      renderAll();
+      return;
+    }
+
     const data = await fileToBase64(file);
     const response = await fetch("/api/files/extract", {
       method: "POST",

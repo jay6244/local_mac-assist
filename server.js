@@ -11,6 +11,7 @@ const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
 const COMFYUI_URL = process.env.COMFYUI_URL || "http://127.0.0.1:8188";
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const MAX_REFERENCE_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_EXTRACTED_CHARS = 45000;
 const MAX_PDF_PAGES_FOR_CITATIONS = 80;
 
@@ -184,7 +185,7 @@ async function handleExtractFile(req, res) {
     const body = await readRequestBody(req, MAX_UPLOAD_BYTES * 2);
     const extracted = await extractFileText(body);
     sendJson(res, 200, extracted);
-  } catch {
+  } catch (error) {
     sendJson(res, error.statusCode || 500, {
       error: error.message || "Could not extract that file."
     });
@@ -258,10 +259,23 @@ function enhancePhotoPrompt(prompt) {
   ].join(", ");
 }
 
-function buildComfyWorkflow({ prompt, checkpoint, width, height, seed }) {
-  const fastCheckpoint = /lightning|turbo/i.test(checkpoint);
+function parseDataUrl(dataUrl = "") {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    const error = new Error("Reference image data is invalid.");
+    error.statusCode = 400;
+    throw error;
+  }
 
   return {
+    mimeType: match[1],
+    buffer: Buffer.from(match[2], "base64")
+  };
+}
+
+function buildComfyWorkflow({ prompt, checkpoint, width, height, seed, uploadedImageName }) {
+  const fastCheckpoint = /lightning|turbo/i.test(checkpoint);
+  const workflow = {
     "1": {
       class_type: "CheckpointLoaderSimple",
       inputs: {
@@ -320,6 +334,27 @@ function buildComfyWorkflow({ prompt, checkpoint, width, height, seed }) {
       }
     }
   };
+
+  if (uploadedImageName) {
+    delete workflow["4"];
+    workflow["4"] = {
+      class_type: "LoadImage",
+      inputs: {
+        image: uploadedImageName
+      }
+    };
+    workflow["8"] = {
+      class_type: "VAEEncode",
+      inputs: {
+        pixels: ["4", 0],
+        vae: ["1", 2]
+      }
+    };
+    workflow["5"].inputs.denoise = fastCheckpoint ? 0.52 : 0.62;
+    workflow["5"].inputs.latent_image = ["8", 0];
+  }
+
+  return workflow;
 }
 
 async function generateWithCloud({ prompt, width, height, seed }) {
@@ -349,18 +384,50 @@ async function generateWithCloud({ prompt, width, height, seed }) {
   };
 }
 
-async function generateWithComfyUI({ prompt, checkpoint, width, height, seed }) {
+async function uploadComfyReferenceImage(referenceImage) {
+  if (!referenceImage?.dataUrl) return "";
+
+  const { mimeType, buffer } = parseDataUrl(referenceImage.dataUrl);
+  if (buffer.length > MAX_REFERENCE_IMAGE_BYTES) {
+    const error = new Error("Reference images must be 8 MB or smaller.");
+    error.statusCode = 413;
+    throw error;
+  }
+
+  const safeName = String(referenceImage.name || "reference.png").replace(/[^a-z0-9_.-]/gi, "_");
+  const form = new FormData();
+  form.append("image", new Blob([buffer], { type: mimeType }), safeName);
+  form.append("overwrite", "true");
+
+  const response = await fetch(`${COMFYUI_URL}/upload/image`, {
+    method: "POST",
+    body: form
+  });
+
+  if (!response.ok) {
+    const error = new Error("ComfyUI could not accept the reference image.");
+    error.statusCode = 502;
+    throw error;
+  }
+
+  const result = await response.json();
+  return result.name || safeName;
+}
+
+async function generateWithComfyUI({ prompt, checkpoint, width, height, seed, referenceImage }) {
   let promptResponse;
   try {
+    const uploadedImageName = await uploadComfyReferenceImage(referenceImage);
     promptResponse = await fetch(`${COMFYUI_URL}/prompt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         client_id: randomUUID(),
-        prompt: buildComfyWorkflow({ prompt, checkpoint, width, height, seed })
+        prompt: buildComfyWorkflow({ prompt, checkpoint, width, height, seed, uploadedImageName })
       })
     });
   } catch (error) {
+    if (error.statusCode) throw error;
     const comfyError = new Error(`ComfyUI is not reachable at ${COMFYUI_URL}. Start ComfyUI or switch to Cloud fallback.`);
     comfyError.statusCode = 503;
     throw comfyError;
@@ -397,7 +464,8 @@ async function generateWithComfyUI({ prompt, checkpoint, width, height, seed }) 
       return {
         imageUrl,
         image: `data:${contentType};base64,${imageBuffer.toString("base64")}`,
-        provider: "ComfyUI"
+        provider: "ComfyUI",
+        usedReference: Boolean(referenceImage?.dataUrl)
       };
     }
   }
@@ -409,7 +477,7 @@ async function generateWithComfyUI({ prompt, checkpoint, width, height, seed }) 
 
 async function handleGenerateImage(req, res) {
   try {
-    const body = await readRequestBody(req);
+    const body = await readRequestBody(req, MAX_REFERENCE_IMAGE_BYTES * 2 + 2 * 1024 * 1024);
     const prompt = String(body.prompt || "").trim();
     if (!prompt) {
       sendJson(res, 400, { error: "Prompt is required." });
@@ -427,6 +495,7 @@ async function handleGenerateImage(req, res) {
     const height = Math.min(1280, Math.max(512, Number(body.height || 1024)));
     const provider = ["auto", "comfyui", "cloud"].includes(body.provider) ? body.provider : "auto";
     const checkpoint = String(body.checkpoint || "").trim() || "juggernautXL_v9Rdphoto2Lightning.safetensors";
+    const referenceImage = body.referenceImage?.dataUrl ? body.referenceImage : null;
     const seed = Number.isFinite(Number(body.seed)) && Number(body.seed) >= 0
       ? Number(body.seed)
       : Math.floor(Math.random() * 1_000_000_000);
@@ -437,7 +506,7 @@ async function handleGenerateImage(req, res) {
       result = await generateWithCloud({ prompt: enhancedPrompt, width, height, seed });
     } else {
       try {
-        result = await generateWithComfyUI({ prompt: enhancedPrompt, checkpoint, width, height, seed });
+        result = await generateWithComfyUI({ prompt: enhancedPrompt, checkpoint, width, height, seed, referenceImage });
       } catch (error) {
         if (provider === "comfyui") throw error;
         fallbackReason = error.message;
@@ -449,7 +518,8 @@ async function handleGenerateImage(req, res) {
       ...result,
       prompt: enhancedPrompt,
       seed,
-      fallbackReason
+      fallbackReason,
+      usedReference: Boolean(result.usedReference)
     });
   } catch (error) {
     sendJson(res, error.statusCode || 503, {
