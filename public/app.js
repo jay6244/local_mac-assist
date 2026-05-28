@@ -263,6 +263,25 @@ function createMessageNode(message) {
 
     imageLink.append(image);
     node.append(imageLink);
+
+    const imageActions = document.createElement("div");
+    imageActions.className = "image-actions";
+
+    const openButton = document.createElement("a");
+    openButton.className = "image-action-button";
+    openButton.href = message.imageUrl;
+    openButton.target = "_blank";
+    openButton.rel = "noreferrer";
+    openButton.textContent = "Open full size";
+
+    const downloadButton = document.createElement("button");
+    downloadButton.className = "image-action-button";
+    downloadButton.type = "button";
+    downloadButton.textContent = "Download";
+    downloadButton.addEventListener("click", () => downloadImage(message));
+
+    imageActions.append(openButton, downloadButton);
+    node.append(imageActions);
   }
 
   if (message.image && !message.imageUrl) {
@@ -289,6 +308,15 @@ function createMessageNode(message) {
   }
 
   return node;
+}
+
+function downloadImage(message) {
+  const source = message.image || message.imageUrl;
+  if (!source) return;
+  const anchor = document.createElement("a");
+  anchor.href = source;
+  anchor.download = `${titleFromMessage(message.prompt || "generated-image").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "generated-image"}.png`;
+  anchor.click();
 }
 
 function renderMessages() {
@@ -586,6 +614,15 @@ async function sendCurrentConversation() {
 
 async function generateImageForConversation(prompt) {
   const conversation = activeConversation();
+  if (/^(an?\s+)?(image|photo|picture|photograph)$/i.test(prompt.trim())) {
+    conversation.messages.push({
+      role: "error",
+      content: "Tell me the subject too, for example: `/image realistic photo of a flying horse at sunset`."
+    });
+    saveState();
+    renderAll();
+    return;
+  }
   const [width, height] = imageSizeEl.value.split("x").map(Number);
   const provider = imageProviderEl.value;
   const providerLabel = provider === "comfyui" ? "ComfyUI" : provider === "cloud" ? "cloud fallback" : "auto image engine";
