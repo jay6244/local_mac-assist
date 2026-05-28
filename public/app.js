@@ -427,16 +427,20 @@ async function streamAssistantReply(conversation) {
 
   if (!response.ok || !response.body) throw new Error("Chat stream failed to start.");
 
-  const assistantMessage = { role: "assistant", content: "" };
-  conversation.messages.push(assistantMessage);
-  renderMessages();
-
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  let assistantMessage = null;
   let buffer = "";
+  let hasReceivedToken = false;
 
   while (true) {
-    const { value, done } = await reader.read();
+    const readResult = await Promise.race([
+      reader.read(),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Local streaming paused, retrying without streaming.")), hasReceivedToken ? 60000 : 12000);
+      })
+    ]);
+    const { value, done } = readResult;
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
@@ -445,6 +449,11 @@ async function streamAssistantReply(conversation) {
 
     for (const item of parsed.events) {
       if (item.event === "token") {
+        if (!assistantMessage) {
+          assistantMessage = { role: "assistant", content: "" };
+          conversation.messages.push(assistantMessage);
+        }
+        hasReceivedToken = true;
         assistantMessage.content += item.data.content;
         renderMessages();
       }
@@ -454,6 +463,30 @@ async function streamAssistantReply(conversation) {
     }
   }
 
+  if (!assistantMessage) throw new Error("The local model returned an empty response.");
+
+  conversation.updatedAt = Date.now();
+  saveState();
+  renderAll();
+}
+
+async function fetchAssistantReply(conversation) {
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: buildModelMessages(conversation),
+      model: currentModel(),
+      demo: demoModeEl.checked
+    })
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.detail || result.error || "Chat request failed.");
+
+  conversation.messages.push({
+    role: "assistant",
+    content: result.content || ""
+  });
   conversation.updatedAt = Date.now();
   saveState();
   renderAll();
@@ -467,10 +500,15 @@ async function sendCurrentConversation() {
     await streamAssistantReply(conversation);
   } catch (error) {
     if (error.name !== "AbortError") {
-      conversation.messages.push({
-        role: "error",
-        content: `${error.message}\n\nThe chat side uses Ollama. Images use the image engine automatically. If this keeps happening, start Ollama with \`ollama serve\` or turn Demo on in Settings.`
-      });
+      try {
+        statusEl.textContent = "Retrying...";
+        await fetchAssistantReply(conversation);
+      } catch (fallbackError) {
+        conversation.messages.push({
+          role: "error",
+          content: `${fallbackError.message}\n\nThe chat side uses Ollama. Images use the image engine automatically. If this keeps happening, start Ollama with \`ollama serve\` or turn Demo on in Settings.`
+        });
+      }
     }
     saveState();
     renderAll();
