@@ -817,7 +817,10 @@ async function handleStatic(req, res) {
 
   try {
     const file = await readFile(filePath);
-    res.writeHead(200, { "Content-Type": mimeTypes[extname(filePath)] || "application/octet-stream" });
+    res.writeHead(200, {
+      "Content-Type": mimeTypes[extname(filePath)] || "application/octet-stream",
+      "Cache-Control": "no-store, max-age=0"
+    });
     res.end(file);
   } catch {
     res.writeHead(404);

@@ -702,10 +702,10 @@ function isNaturalImageRequest(text) {
     .replace(/\breale\s*stic\b/g, "realistic")
     .replace(/\breale?stic\b/g, "realistic")
     .replace(/\bprtrait\b/g, "portrait");
-  return (
-    /\b(generate|create|make|draw|show|give|need|want)\b/.test(typoFriendly) &&
-    /\b(image|photo|picture|portrait|selfie|photograph)\b/.test(typoFriendly)
-  );
+  const hasImageTerm = /\b(image|photo|picture|portrait|selfie|photograph)\b/.test(typoFriendly);
+  const hasCommand = /\b(generate|create|make|draw|show|give|need|want)\b/.test(typoFriendly);
+  const hasPhotoCue = /\b(realistic|photorealistic|sharp|camera|iphone|dslr|cinematic)\b/.test(typoFriendly);
+  return hasImageTerm && (hasCommand || hasPhotoCue);
 }
 
 function imagePromptFromRequest(text) {
