@@ -627,6 +627,21 @@ async function generateImageForConversation(prompt) {
   const provider = imageProviderEl.value;
   const providerLabel = provider === "comfyui" ? "ComfyUI" : provider === "cloud" ? "cloud fallback" : "auto image engine";
   const referenceImage = latestReferenceImage(conversation);
+  if (referenceImage?.dataUrl) {
+    statusEl.textContent = "Optimizing reference image...";
+    const compactDataUrl = await compressImageDataUrl(referenceImage.dataUrl);
+    if (compactDataUrl !== referenceImage.dataUrl) {
+      referenceImage.dataUrl = compactDataUrl;
+      referenceImage.type = "image/jpeg";
+      const analysis = await analyzeImageStyle(compactDataUrl);
+      referenceImage.width = analysis.width;
+      referenceImage.height = analysis.height;
+      referenceImage.styleNotes = analysis.notes;
+      conversation.updatedAt = Date.now();
+      saveState();
+      renderDocuments();
+    }
+  }
   const referencePrompt = referenceImage
     ? `${prompt}. Match the uploaded reference image style: ${referenceImage.styleNotes}`
     : prompt;
@@ -702,7 +717,7 @@ function isNaturalImageRequest(text) {
     .replace(/\breale\s*stic\b/g, "realistic")
     .replace(/\breale?stic\b/g, "realistic")
     .replace(/\bprtrait\b/g, "portrait");
-  const hasImageTerm = /\b(image|photo|picture|portrait|selfie|photograph)\b/.test(typoFriendly);
+  const hasImageTerm = /\b(image|photo|picture|pic|portrait|selfie|photograph)\b/.test(typoFriendly);
   const hasCommand = /\b(generate|create|make|draw|show|give|need|want)\b/.test(typoFriendly);
   const hasPhotoCue = /\b(realistic|photorealistic|sharp|camera|iphone|dslr|cinematic)\b/.test(typoFriendly);
   return hasImageTerm && (hasCommand || hasPhotoCue);
@@ -714,8 +729,8 @@ function imagePromptFromRequest(text) {
     .replace(/\breale\s*stic\b/gi, "realistic")
     .replace(/\breale?stic\b/gi, "realistic")
     .replace(/\bprtrait\b/gi, "portrait")
-    .replace(/^(please\s+)?(generate|create|make|draw|show|give|need|want)\s+(me\s+)?(a|an|the)?\s*/i, "")
-    .replace(/^(image|photo|picture|portrait|selfie|photograph)\s+(of\s+)?/i, "")
+    .replace(/^(please\s+)?(generate|create|make|draw|show|give|need|want)\s+(me\s+)?(?:(a|an|the)\s+)?/i, "")
+    .replace(/^(image|photo|picture|pic|portrait|selfie|photograph)\s+(of\s+)?/i, "")
     .trim();
 }
 
@@ -737,6 +752,25 @@ function fileToDataUrl(file) {
     reader.addEventListener("load", () => resolve(String(reader.result || "")));
     reader.addEventListener("error", () => reject(reader.error));
     reader.readAsDataURL(file);
+  });
+}
+
+function compressImageDataUrl(dataUrl, maxSide = 1024, quality = 0.86) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => {
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    });
+    image.addEventListener("error", () => reject(new Error("Could not read that image.")));
+    image.src = dataUrl;
   });
 }
 
@@ -795,14 +829,15 @@ function analyzeImageStyle(dataUrl) {
 
 async function attachReferenceImage({ dataUrl, name, type, size = 0 }) {
   const conversation = activeConversation();
-  const analysis = await analyzeImageStyle(dataUrl);
+  const compactDataUrl = await compressImageDataUrl(dataUrl);
+  const analysis = await analyzeImageStyle(compactDataUrl);
   const referenceImage = {
     id: crypto.randomUUID(),
     name,
-    type,
+    type: "image/jpeg",
     size,
     uploadedAt: Date.now(),
-    dataUrl,
+    dataUrl: compactDataUrl,
     width: analysis.width,
     height: analysis.height,
     styleNotes: analysis.notes
@@ -818,7 +853,7 @@ async function attachReferenceImage({ dataUrl, name, type, size = 0 }) {
   conversation.messages.push({
     role: "assistant",
     content: `Attached **${name}** as a style reference.\n\nStyle read: ${analysis.notes}\n\nNow ask for an image and I will match this reference as closely as the selected image engine allows.`,
-    image: dataUrl,
+    image: compactDataUrl,
     prompt: name
   });
 

@@ -11,7 +11,7 @@ const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
 const COMFYUI_URL = process.env.COMFYUI_URL || "http://127.0.0.1:8000";
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
-const MAX_REFERENCE_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_EXTRACTED_CHARS = 45000;
 const MAX_PDF_PAGES_FOR_CITATIONS = 80;
 
